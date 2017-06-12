@@ -22,8 +22,8 @@ unsigned int * g_out_ptr; //todo ?
 typedef struct blowfish_job {
     struct snap_addr input_data;
     struct snap_addr output_data;
-    uint32_t data_mode; // 0 for encryption and 1 (or anything not 0) for decryption
-    uint32_t data_length; // should be padded and 128 byte aligned
+    uint32_t data_length; // should be 128 byte aligned and padded if plaintext
+    uint32_t mode; // 0 for encryption and 1 (or anything not 0) for decryption
 } blowfish_job_t;
 
 typedef struct blowfish_out {
