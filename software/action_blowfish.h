@@ -12,26 +12,34 @@ extern "C" {
 
 #define BLOWFISH_ACTION_TYPE 0x00000108
 
+#define MODE_SET_KEY 0
+#define MODE_ENCRYPT 1
+#define MODE_DECRYPT 2
+
 #ifndef CACHELINE_BYTES
 #define CACHELINE_BYTES 128
 #endif
-unsigned int * g_out_ptr; //todo ?
 
 // Blowfish Configuration PATTERN.
 // This must match with DATA structure in hls_blowfish/kernel.cpp
 typedef struct blowfish_job {
+    uint32_t mode;
+    uint32_t data_length;
     struct snap_addr input_data;
-    struct snap_addr output_data;
-    uint32_t data_length; // should be 128 byte aligned and padded if plaintext
-    uint32_t mode; // 0 for encryption and 1 (or anything not 0) for decryption
+    struct snap_addr output_data; // not needed for MODE_SET_KEY
 } blowfish_job_t;
 
+/*
+// For later:
 typedef struct blowfish_out {
     uint32_t length;
     char * data;
 } blowfish_out_t;
 
-int blowfish(char * input_data, unsigned int input_length, unsigned int mode, blowfish_out_t * output);
+
+int blowfish(char * input_data, unsigned int input_length, char * key, unsigned int key_length, unsigned int mode, blowfish_out_t * output);
+
+*/
 
 #ifdef __cplusplus
 }
