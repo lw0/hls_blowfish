@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-include ./config.mk
+include ../config.mk
 
 DESTDIR ?= /usr
 libs = ../lib/libsnap.a
@@ -28,13 +28,13 @@ else
 LDLIBS += -lcxl
 endif
 
-snap_blowfish_objs = action_blowfish.o
+#snap_blowfish_objs = action_blowfish.o
 
 projs = snap_blowfish
 
 all: $(objs) $(projs)
 
-snap_search: action_search.o
+#snap_blowfish: action_blowfish.o
 
 $(projs): $(libs)
 
