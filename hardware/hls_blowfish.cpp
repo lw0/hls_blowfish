@@ -55,15 +55,16 @@ void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
     right = tmp;
 }
 
-bool bf_keyInit(bf_halfBlock_t * key, snapu8_t keyWords)
+void bf_keyInit(snap_membus_t key, snapu8_t keyWords)
 {
     for (int i = 0; i < 18; ++i)
     {
-        g_P[i] = c_initP[i] ^ key[i%keyWords];
+        bf_halfBlock_t keyWord = key((i%keyWords)*32,(i%keyWords)*32+31);
+        g_P[i] = c_initP[i] ^ keyWord;
     }
-    for (int n=0 ; n<4 ; ++n)
+    for (int n = 0; n < 4; ++n)
     {
-        for (int i=0 ; i<256; ++i)
+        for (int i = 0; i < 256; ++i)
         {
             g_S[n][i] = c_initS[n][i];
         }
@@ -75,9 +76,9 @@ bool bf_keyInit(bf_halfBlock_t * key, snapu8_t keyWords)
         g_P[i] = left;
         g_P[i+1] = right;
     }
-    for (int n=0 ; n<4 ; ++n)
+    for (int n = 0; n < 4; ++n)
     {
-        for (int i=0 ; i<256; i+=2)
+        for (int i = 0; i < 256; i += 2)
         {
             bf_encrypt(left, right);
             g_S[n][i] = left;
@@ -91,7 +92,7 @@ snapu32_t action_setkey(snap_membus_t * hostMem_in, snapu64_t keyAddr, snapu32_t
     snapu64_t keyLineAddr = keyAddr >> ADDR_RIGHT_SHIFT;
     snapu8_t keyWords = keyBytes >> BF_HBLOCK_BADR_BITS;
     if ((keyBytes & BF_HBLOCK_BADR_MASK) != 0 || // check keyword (half blockwidth) alignment
-        keyWords < BF_KEY_HBLOCK_MIN || keyWords > BF_KEY_HBLOCK_MAX) // check keyword count
+        BF_KEY_HBLOCK_MAX < keyWords || keyWords < BF_KEY_HBLOCK_MIN) // check keyword count
     {
         return SNAP_RETC_FAILURE;
     }
@@ -100,7 +101,7 @@ snapu32_t action_setkey(snap_membus_t * hostMem_in, snapu64_t keyAddr, snapu32_t
     snap_membus_t keyLine = *(hostMem_in + keyLineAddr);
     
     // cast line to keyword granularity, initialize g_S, and g_P arrays
-    bf_keyInit((bf_halfBlock_t *)(&keyLine), keyWords);
+    bf_keyInit(keyLine, keyWords);
 
     return SNAP_RETC_SUCCESS;
 }
@@ -149,7 +150,7 @@ snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
         *(hostMem_out + outLineAddr + lineOffset) = line;
     }
 
-
+    return SNAP_RETC_SUCCESS;
 }
 
 //--------------------------------------------------------------------------------------------
@@ -201,19 +202,19 @@ void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
     byteCount = action_reg->Data.data_length;
     mode = action_reg->Data.mode;
 
-    printf("Opcode %d (inAddr: %x, outAddr: %x, byteCount: %d)", mode, inAddr, outAddr, byteCount);
-    printf("Opcodes: SET_KEY %d, ENCRYPT %d, DECRYPT %d)", MODE_SET_KEY, MODE_ENCRYPT, MODE_DECRYPT);
+    //printf("Opcode %d (inAddr: %x, outAddr: %x, byteCount: %d)", mode, inAddr, outAddr, byteCount);
+    //printf("Opcodes: SET_KEY %d, ENCRYPT %d, DECRYPT %d)", MODE_SET_KEY, MODE_ENCRYPT, MODE_DECRYPT);
 
     snapu32_t retc = SNAP_RETC_SUCCESS;
     switch (mode)
     {
-    MODE_SET_KEY:
+    case MODE_SET_KEY:
         retc = action_setkey(din_gmem, inAddr, byteCount);
         break;
-    MODE_ENCRYPT:
+    case MODE_ENCRYPT:
         retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr, byteCount, 0);
         break;
-    MODE_DECRYPT:
+    case MODE_DECRYPT:
         retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr, byteCount, 1);
         break;
     default:
