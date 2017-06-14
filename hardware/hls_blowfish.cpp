@@ -98,7 +98,7 @@ snapu32_t action_setkey(snap_membus_t * hostMem_in, snapu64_t keyAddr, snapu32_t
     }
     
     // key fits in a single line, fetch it
-    snap_membus_t keyLine = *(hostMem_in + keyLineAddr);
+    snap_membus_t keyLine = hostMem_in[keyLineAddr];
     
     // cast line to keyword granularity, initialize g_S, and g_P arrays
     bf_keyInit(keyLine, keyWords);
@@ -122,7 +122,7 @@ snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
     for (snapu32_t lineOffset = 0; lineOffset < lineCount; ++lineOffset)
     {
         // fetch next line
-        snap_membus_t line = *(hostMem_in + inLineAddr + lineOffset);
+        snap_membus_t line = hostMem_in[inLineAddr + lineOffset];
 
         // determine number of valid blocks in line
         snapu8_t blockCount = dataBlocks - (lineOffset * BF_BLOCKSPERLINE);
@@ -147,7 +147,7 @@ snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
         }
 
         // write processed line
-        *(hostMem_out + outLineAddr + lineOffset) = line;
+        hostMem_out[outLineAddr + lineOffset] = line;
     }
 
     return SNAP_RETC_SUCCESS;
@@ -202,8 +202,6 @@ void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
     byteCount = action_reg->Data.data_length;
     mode = action_reg->Data.mode;
 
-    //printf("Opcode %d (inAddr: %x, outAddr: %x, byteCount: %d)", mode, inAddr, outAddr, byteCount);
-    //printf("Opcodes: SET_KEY %d, ENCRYPT %d, DECRYPT %d)", MODE_SET_KEY, MODE_ENCRYPT, MODE_DECRYPT);
 
     snapu32_t retc = SNAP_RETC_SUCCESS;
     switch (mode)
