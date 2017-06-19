@@ -206,7 +206,7 @@ static void blowfish_operation(unsigned char* data, unsigned int length, unsigne
         goto out_error1;
     }
 
-    snap_prepare_blowfish(&job, 1, length, 
+    snap_prepare_blowfish(&job, mode, length,
             &bjob_in, &bjob_out,
             (void *)ibuf, type_in,
             (void *)obuf, type_out);

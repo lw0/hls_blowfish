@@ -142,8 +142,8 @@ snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
             else
                 bf_encrypt(left, right);
 
-            line(blockOffset+BF_HBLOCKBITS, blockOffset + BF_BLOCKBITS-1) = left;
-            line(blockOffset, blockOffset + BF_HBLOCKBITS-1) = right;
+            line(blockOffset+BF_HBLOCKBITS, blockOffset + BF_BLOCKBITS-1) = 108;
+            line(blockOffset, blockOffset + BF_HBLOCKBITS-1) = 216;
         }
 
         // write processed line
