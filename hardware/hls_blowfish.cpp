@@ -1,11 +1,14 @@
 #include <string.h>
-#include "ap_int.h"
+#include <iostream>
 #include <hls_stream.h>
+#include "ap_int.h"
 #include "action_blowfish.H"
 
 #define HW_RELEASE_LEVEL       0x00000013
 
 #include "hls_blowfish_data.hpp"
+
+using namespace std;
 
 bf_P_t g_P;
 bf_S_t g_S;
@@ -89,21 +92,21 @@ void bf_keyInit(snap_membus_t key, snapu8_t keyWords)
 
 snapu32_t action_setkey(snap_membus_t * hostMem_in, snapu64_t keyAddr, snapu32_t keyBytes)
 {
-    snapu64_t keyLineAddr = keyAddr >> ADDR_RIGHT_SHIFT;
-    snapu8_t keyWords = keyBytes >> BF_HBLOCK_BADR_BITS;
-    if ((keyBytes & BF_HBLOCK_BADR_MASK) != 0 || // check keyword (half blockwidth) alignment
-        BF_KEY_HBLOCK_MAX < keyWords || keyWords < BF_KEY_HBLOCK_MIN) // check keyword count
-    {
-        return SNAP_RETC_FAILURE;
-    }
-    
-    // key fits in a single line, fetch it
-    snap_membus_t keyLine = hostMem_in[keyLineAddr];
-    
-    // cast line to keyword granularity, initialize g_S, and g_P arrays
-    bf_keyInit(keyLine, keyWords);
+	snapu64_t keyLineAddr = keyAddr >> ADDR_RIGHT_SHIFT;
+	snapu8_t keyWords = keyBytes >> BF_HBLOCK_BADR_BITS;
 
-    return SNAP_RETC_SUCCESS;
+	if ((keyBytes & BF_HBLOCK_BADR_MASK) != 0 || // check keyword (half blockwidth) alignment
+	    BF_KEY_HBLOCK_MAX < keyWords || keyWords < BF_KEY_HBLOCK_MIN) { // check keyword count
+		return SNAP_RETC_FAILURE;
+	}
+    
+	// key fits in a single line, fetch it
+	snap_membus_t keyLine = hostMem_in[keyLineAddr];
+    
+	// cast line to keyword granularity, initialize g_S, and g_P arrays
+	bf_keyInit(keyLine, keyWords);
+
+	return SNAP_RETC_SUCCESS;
 }
 
 snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
@@ -157,69 +160,69 @@ static snapu32_t process_action(snap_membus_t * din_gmem,
                                 snap_membus_t * dout_gmem,
                                 action_reg * action_reg)
 {
-    snapu64_t inAddr;
-    snapu64_t outAddr;
-    /* snapu64_t inAddrSwp; */
-    /* snapu64_t outAddrSwp; */
-    snapu32_t byteCount;
-    snapu32_t mode;
-    //== Parameters fetched in memory ==
-    //==================================
+	snapu64_t inAddr;
+	snapu64_t outAddr;
+	/* snapu64_t inAddrSwp; */
+	/* snapu64_t outAddrSwp; */
+	snapu32_t byteCount;
+	snapu32_t mode;
 
-    // byte address received need to be aligned with port width
-    inAddr  = action_reg->Data.input_data.addr;
-    outAddr  = action_reg->Data.output_data.addr;
-    byteCount = action_reg->Data.data_length;
-    mode = action_reg->Data.mode;
+	//== Parameters fetched in memory ==
+	//==================================
 
-    //TODO debug:
-    /* inAddrSwp = ((inAddr >> 56) & 0x00000000000000ff) | */
-    /*             ((inAddr >> 48) & 0x000000000000ff00) | */
-    /*             ((inAddr >> 40) & 0x0000000000ff0000) | */
-    /*             ((inAddr >> 32) & 0x00000000ff000000) | */
-    /*             ((inAddr >> 24) & 0x000000ff00000000) | */
-    /*             ((inAddr >> 16) & 0x0000ff0000000000) | */
-    /*             ((inAddr >>  8) & 0x00ff000000000000) | */
-    /*             ((inAddr >>  0) & 0xff00000000000000); */
-    /* outAddrSwp = ((outAddr >> 56) & 0x00000000000000ff) | */
-    /*              ((outAddr >> 48) & 0x000000000000ff00) | */
-    /*              ((outAddr >> 40) & 0x0000000000ff0000) | */
-    /*              ((outAddr >> 32) & 0x00000000ff000000) | */
-    /*              ((outAddr >> 24) & 0x000000ff00000000) | */
-    /*              ((outAddr >> 16) & 0x0000ff0000000000) | */
-    /*              ((outAddr >>  8) & 0x00ff000000000000) | */
-    /*              ((outAddr >>  0) & 0xff00000000000000); */
+	// byte address received need to be aligned with port width
+	inAddr  = action_reg->Data.input_data.addr;
+	outAddr  = action_reg->Data.output_data.addr;
+	byteCount = action_reg->Data.data_length;
+	mode = action_reg->Data.mode;
 
-    snapu32_t retc = SNAP_RETC_SUCCESS;
-    switch (mode)
-    {
-    case MODE_SET_KEY:
-        retc = action_setkey(din_gmem, inAddr, byteCount);
-        break;
-    case MODE_ENCRYPT:
-        retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr, byteCount, 0);
-        break;
-    case MODE_DECRYPT:
-        retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr, byteCount, 1);
-        break;
-    default:
-        break;
-    }
+	//TODO debug:
+	/* inAddrSwp = ((inAddr >> 56) & 0x00000000000000ff) | */
+	/*             ((inAddr >> 48) & 0x000000000000ff00) | */
+	/*             ((inAddr >> 40) & 0x0000000000ff0000) | */
+	/*             ((inAddr >> 32) & 0x00000000ff000000) | */
+	/*             ((inAddr >> 24) & 0x000000ff00000000) | */
+	/*             ((inAddr >> 16) & 0x0000ff0000000000) | */
+	/*             ((inAddr >>  8) & 0x00ff000000000000) | */
+	/*             ((inAddr >>  0) & 0xff00000000000000); */
+	/* outAddrSwp = ((outAddr >> 56) & 0x00000000000000ff) | */
+	/*              ((outAddr >> 48) & 0x000000000000ff00) | */
+	/*              ((outAddr >> 40) & 0x0000000000ff0000) | */
+	/*              ((outAddr >> 32) & 0x00000000ff000000) | */
+	/*              ((outAddr >> 24) & 0x000000ff00000000) | */
+	/*              ((outAddr >> 16) & 0x0000ff0000000000) | */
+	/*              ((outAddr >>  8) & 0x00ff000000000000) | */
+	/*              ((outAddr >>  0) & 0xff00000000000000); */
 
-    /* snap_membus_t buffer[16]; */
-    /* memcpy(buffer, (snap_membus_t *)(din_gmem + (inAddr >> ADDR_RIGHT_SHIFT)), 64); */
-    /* memcpy((snap_membus_t *)(dout_gmem + (outAddr >> ADDR_RIGHT_SHIFT)), buffer, 64); */
+	snapu32_t retc = SNAP_RETC_SUCCESS;
+	switch (mode) {
+	case MODE_SET_KEY:
+		retc = action_setkey(din_gmem, inAddr, byteCount);
+		break;
+	case MODE_ENCRYPT:
+		retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr, byteCount, 0);
+		break;
+	case MODE_DECRYPT:
+		retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr, byteCount, 1);
+		break;
+	default:
+		break;
+	}
 
-    /* (din_gmem + (inAddr >>ADDR_RIGHT_SHIFT))[0] =       0x1111111111111111111111111111111111111111111111111111111111111111; */
-    /* (din_gmem + (outAddr >>ADDR_RIGHT_SHIFT))[0] =      0x2222222222222222222222222222222222222222222222222222222222222222; */
-    /* (din_gmem + (inAddrSwp >>ADDR_RIGHT_SHIFT))[0] =    0x3333333333333333333333333333333333333333333333333333333333333333; */
-    /* (din_gmem + (outAddrSwp >>ADDR_RIGHT_SHIFT))[0] =   0x4444444444444444444444444444444444444444444444444444444444444444; */
-    /* (dout_gmem + (inAddr >>ADDR_RIGHT_SHIFT))[0] =      0x5555555555555555555555555555555555555555555555555555555555555555; */
-    /* (dout_gmem + (outAddr >>ADDR_RIGHT_SHIFT))[0] =     0x6666666666666666666666666666666666666666666666666666666666666666; */
-    /* (dout_gmem + (inAddrSwp >>ADDR_RIGHT_SHIFT))[0] =   0x7777777777777777777777777777777777777777777777777777777777777777; */
-    /* (dout_gmem + (outAddrSwp >>ADDR_RIGHT_SHIFT))[0] =  0x8888888888888888888888888888888888888888888888888888888888888888; */
+	/* snap_membus_t buffer[16]; */
+	/* memcpy(buffer, (snap_membus_t *)(din_gmem + (inAddr >> ADDR_RIGHT_SHIFT)), 64); */
+	/* memcpy((snap_membus_t *)(dout_gmem + (outAddr >> ADDR_RIGHT_SHIFT)), buffer, 64); */
 
-    return retc;
+	/* (din_gmem + (inAddr >>ADDR_RIGHT_SHIFT))[0] =       0x1111111111111111111111111111111111111111111111111111111111111111; */
+	/* (din_gmem + (outAddr >>ADDR_RIGHT_SHIFT))[0] =      0x2222222222222222222222222222222222222222222222222222222222222222; */
+	/* (din_gmem + (inAddrSwp >>ADDR_RIGHT_SHIFT))[0] =    0x3333333333333333333333333333333333333333333333333333333333333333; */
+	/* (din_gmem + (outAddrSwp >>ADDR_RIGHT_SHIFT))[0] =   0x4444444444444444444444444444444444444444444444444444444444444444; */
+	/* (dout_gmem + (inAddr >>ADDR_RIGHT_SHIFT))[0] =      0x5555555555555555555555555555555555555555555555555555555555555555; */
+	/* (dout_gmem + (outAddr >>ADDR_RIGHT_SHIFT))[0] =     0x6666666666666666666666666666666666666666666666666666666666666666; */
+	/* (dout_gmem + (inAddrSwp >>ADDR_RIGHT_SHIFT))[0] =   0x7777777777777777777777777777777777777777777777777777777777777777; */
+	/* (dout_gmem + (outAddrSwp >>ADDR_RIGHT_SHIFT))[0] =  0x8888888888888888888888888888888888888888888888888888888888888888; */
+
+	return retc;
 }
 
 
@@ -229,7 +232,7 @@ static snapu32_t process_action(snap_membus_t * din_gmem,
 // This example doesn't use FPGA DDR.
 // Need to set Environment Variable "SDRAM_USED=FALSE" before compilation.
 void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
-        action_reg *action_reg, action_RO_config_reg *Action_Config)
+		action_reg *action_reg, action_RO_config_reg *Action_Config)
 {
     // Host Memory AXI Interface
 #pragma HLS INTERFACE m_axi port=din_gmem bundle=host_mem offset=slave depth=512
@@ -244,65 +247,88 @@ void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
 #pragma HLS INTERFACE s_axilite port=action_reg bundle=ctrl_reg	offset=0x100
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
-    /* Required Action Type Detection */
-    switch (action_reg->Control.flags) {
+	/* Required Action Type Detection */
+	switch (action_reg->Control.flags) {
         case 0:
-            Action_Config->action_type = (snapu32_t)BLOWFISH_ACTION_TYPE;
-            Action_Config->release_level = (snapu32_t)HW_RELEASE_LEVEL;
-            action_reg->Control.Retc = (snapu32_t)0xe00f;
-            break;
+		Action_Config->action_type = (snapu32_t)BLOWFISH_ACTION_TYPE;
+		Action_Config->release_level = (snapu32_t)HW_RELEASE_LEVEL;
+		action_reg->Control.Retc = (snapu32_t)0xe00f;
+		break;
         default:
-            action_reg->Control.Retc = process_action(din_gmem, dout_gmem, action_reg);
-            break;
-    }
-    return;
+		action_reg->Control.Retc = process_action(din_gmem, dout_gmem, action_reg);
+		break;
+	}
 }
+
+//-----------------------------------------------------------------------------
+//--- TESTBENCH ---------------------------------------------------------------
+//-----------------------------------------------------------------------------
+
+#ifdef NO_SYNTH
 
 int main()
 {
     static snap_membus_t din_gmem[1024];
     static snap_membus_t dout_gmem[1024];
-
     action_reg act_reg;
     action_RO_config_reg act_config;
+    static const uint8_t ptext[] = { 0xff, 0xee, 0xdd, 0xcc,
+				     0xbb, 0xaa, 0x99, 0x88,
+				     0x77, 0x66, 0x55, 0x44,
+				     0x33, 0x22, 0x11, 0x00 };
 
     act_reg.Control.flags = 0x0;
     hls_action(din_gmem, dout_gmem, &act_reg, &act_config);
     fprintf(stderr, "ACTION_TYPE:   %08x\nRELEASE_LEVEL: %08x\nRETC:          %04x\n",
-	                (unsigned int)act_config.action_type,
-	                (unsigned int)act_config.release_level,
-                    (unsigned int)act_reg.control.Retc);
+	    (unsigned int)act_config.action_type,
+	    (unsigned int)act_config.release_level,
+	    (unsigned int)act_reg.Control.Retc);
 
+    *(uint64_t *)(void *)&din_gmem[0] = 0x0706050403020100ull; // key 8 Byte at 0x0
+    memcpy((uint8_t *)(void *)&din_gmem[2], ptext, sizeof(ptext)); // plaintext 16 Byte at 0x80
 
-    din_gmem[0] = 0x0706050403020100; // key 8 Byte at 0x0
-    din_gmem[2] = 0xffeeddccbbaa99887766554433221100; // plaintext 16 Byte at 0x80
-    // ciphertext 16 Byte at 0x100
-    
+    fprintf(stderr, "// MODE_SET_KEY ciphertext 16 Byte at 0x100\n");
     act_reg.Control.flags = 0x1;
-    act_reg.Data.input_data.addr = 0x0;
+    act_reg.Data.input_data.addr = 0;
     act_reg.Data.data_length = 8;
     act_reg.Data.mode = MODE_SET_KEY;
 
     hls_action(din_gmem, dout_gmem, &act_reg, &act_config);
 
+    fprintf(stderr, "// MODE_ENCRYPT data ...\n");
     act_reg.Control.flags = 0x1;
-    act_reg.Data.input_data.addr = 0x80;
-    act_reg.Data.output_data.addr = 0x100;
+    act_reg.Data.input_data.addr = 2 * sizeof(snap_membus_t);
+    act_reg.Data.output_data.addr = 4 * sizeof(snap_membus_t);
     act_reg.Data.data_length = 16;
     act_reg.Data.mode = MODE_ENCRYPT;
 
     hls_action(din_gmem, dout_gmem, &act_reg, &act_config);
     
-    printf("plain:");
-    for (int i = 0; i < act_reg.Data.data_length; ++i)
-    {
-        printf("%02x ", dout_gmem[2](8*i, 8*i+7));
+    printf("plain:  ");
+    const uint8_t *plain = (uint8_t *)(void *)&din_gmem[2];
+    for (unsigned int i = 0; i < act_reg.Data.data_length; ++i) {
+	    printf("%02x ", plain[i]);
     }
-    printf("\ncipher:");
-    for (int i = 0; i < act_reg.Data.data_length; ++i)
-    {
-        printf("%02x ", dout_gmem[4](8*i, 8*i+7));
+
+    printf("\ncipher: ");
+    const uint8_t *cypher = (uint8_t *)(void *)&dout_gmem[4];
+    for (unsigned int i = 0; i < act_reg.Data.data_length; ++i) {
+	    printf("%02x ", cypher[i]);
     }
+
+    printf("\ndin:\n");
+    for (unsigned int i = 0; i < ARRAY_SIZE(din_gmem); i++)
+	    if (din_gmem[i] != 0)
+		    cout << setw(4)  << i * sizeof(snap_membus_t) << ": "
+			 << setw(32) << hex << din_gmem[i]
+			 << endl;
+
+    printf("\ndout:\n");
+    for (unsigned int i = 0; i < ARRAY_SIZE(dout_gmem); i++)
+	    if (dout_gmem[i] != 0)
+		    cout << setw(4)  << i * sizeof(snap_membus_t) << ": "
+			 << setw(32) << hex << dout_gmem[i]
+			 << endl;
 }
 
-
+#endif /* NO_SYNTH */

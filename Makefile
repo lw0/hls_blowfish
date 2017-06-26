@@ -8,7 +8,8 @@ all:
 	@echo "Please install code via make install"
 
 install:
-	cp -r hardware $(SNAP_ROOT)/hardware/action_examples/hls_blowfish
+	mkdir -p $(SNAP_ROOT)/hardware/action_examples/hls_blowfish
+	cp -r hardware/* $(SNAP_ROOT)/hardware/action_examples/hls_blowfish/
 	cp -r software/examples/* $(SNAP_ROOT)/software/examples/
 
 clean:
