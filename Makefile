@@ -2,7 +2,7 @@
 # Makefile
 #
 
-SNAP_ROOT=../snap
+SNAP_ROOT ?= ../snap
 
 all:
 	@echo "Please install code via make install"
