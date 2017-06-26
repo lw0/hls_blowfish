@@ -23,10 +23,10 @@ extern "C" {
 // Blowfish Configuration PATTERN.
 // This must match with DATA structure in hls_blowfish/kernel.cpp
 typedef struct blowfish_job {
-    uint32_t mode;
-    uint32_t data_length;
     struct snap_addr input_data;
     struct snap_addr output_data; // not needed for MODE_SET_KEY
+    uint32_t data_length;
+    uint32_t mode;
 } blowfish_job_t;
 
 /*

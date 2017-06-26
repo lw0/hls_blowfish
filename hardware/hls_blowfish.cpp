@@ -258,6 +258,7 @@ void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
     return;
 }
 
+#if NO_SYNTH
 int main()
 {
     static snap_membus_t din_gmem[1024];
@@ -305,4 +306,4 @@ int main()
     }
 }
 
-
+#endif
