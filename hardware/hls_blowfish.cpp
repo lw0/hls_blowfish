@@ -138,14 +138,13 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
     snapu64_t outLineAddr = outAddr >> ADDR_RIGHT_SHIFT;
     snapu32_t dataBlocks = dataBytes >> BF_BLOCK_BADR_BITS;
 
-#if 0 /* FIXME check if the condition is correct */
+    /* FIXME check if the condition is correct */
     if ((dataBlocks & BF_BLOCK_BADR_MASK) != 0) // check blockwidth alignment
     {
 	fprintf(stderr, "ERR: dataBytes=%d dataBlocks=%d BF_BLOCKSPERLINE=%d non correctly aligned!\n",
 		(int)dataBytes, (int)dataBlocks, BF_BLOCKSPERLINE);
         return SNAP_RETC_FAILURE;
     }
-#endif
 
     snapu32_t lineCount = dataBlocks / BF_BLOCKSPERLINE;
     fprintf(stderr, "Processing lineCount=%d ...\n", (int)lineCount);
