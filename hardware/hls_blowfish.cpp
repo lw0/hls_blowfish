@@ -14,10 +14,9 @@
 #include <hls_stream.h>
 #include "ap_int.h"
 #include "action_blowfish.H"
+#include "hls_blowfish_data.hpp"
 
 #define HW_RELEASE_LEVEL       0x00000013
-
-#include "hls_blowfish_data.hpp"
 
 using namespace std;
 

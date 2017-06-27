@@ -14,8 +14,8 @@
 # limitations under the License.
 #
 
-#snap_blowfish: action_blowfish.o
-#snap_blowfish_objs = action_blowfish.o
+snap_blowfish: action_blowfish.o
+snap_blowfish_objs = action_blowfish.o
 
 projs += snap_blowfish
 
