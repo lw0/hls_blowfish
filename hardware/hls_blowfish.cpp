@@ -1,3 +1,14 @@
+/**
+ * FIXME Remarks
+ *  - Let us try to reduce the loop counts to the absolutely minimum size,
+ *    that has the potential to reduce the logic size and improve the
+ *    timing.
+ *  - Next step would be to check if we managed to get some parallelism
+ *    in data processing. We might want to add some pragmals to improve
+ *    and/or control this.
+ *  - Timing seems ok so far.
+ */
+
 #include <string.h>
 #include <iostream>
 #include <hls_stream.h>
@@ -10,10 +21,18 @@
 
 using namespace std;
 
-bf_P_t g_P;
-bf_S_t g_S;
+static bf_P_t g_P;
+static bf_S_t g_S;
 
-bf_halfBlock_t bf_f(bf_halfBlock_t h)
+static void print_line(const char *msg, snap_membus_t line)
+{
+#ifdef NO_SYNTH
+	cout << msg << ": " << setw(32) << hex << line
+	     << endl;
+#endif
+}
+
+static bf_halfBlock_t bf_f(bf_halfBlock_t h)
 {
     bf_sEntry_t a = (bf_sEntry_t)(h >> 24),
                 b = (bf_sEntry_t)(h >> 16),
@@ -22,7 +41,7 @@ bf_halfBlock_t bf_f(bf_halfBlock_t h)
     return ((g_S[0][a] + g_S[1][b]) ^ g_S[2][c]) + g_S[3][d];
 }
 
-void bf_encrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
+static void bf_encrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
 {
     for (int i = 0; i < 16; i += 2)
     {
@@ -40,7 +59,7 @@ void bf_encrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
     right = tmp;
 }
 
-void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
+static void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
 {
     for (int i = 16; i > 0; i -= 2)
     {
@@ -58,7 +77,7 @@ void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
     right = tmp;
 }
 
-void bf_keyInit(snap_membus_t key, snapu8_t keyWords)
+static void bf_keyInit(snap_membus_t key, snapu8_t keyWords)
 {
     for (int i = 0; i < 18; ++i)
     {
@@ -90,13 +109,15 @@ void bf_keyInit(snap_membus_t key, snapu8_t keyWords)
     }
 }
 
-snapu32_t action_setkey(snap_membus_t * hostMem_in, snapu64_t keyAddr, snapu32_t keyBytes)
+static snapu32_t action_setkey(snap_membus_t * hostMem_in,
+			       snapu64_t keyAddr, snapu32_t keyBytes)
 {
 	snapu64_t keyLineAddr = keyAddr >> ADDR_RIGHT_SHIFT;
 	snapu8_t keyWords = keyBytes >> BF_HBLOCK_BADR_BITS;
 
 	if ((keyBytes & BF_HBLOCK_BADR_MASK) != 0 || // check keyword (half blockwidth) alignment
-	    BF_KEY_HBLOCK_MAX < keyWords || keyWords < BF_KEY_HBLOCK_MIN) { // check keyword count
+	    BF_KEY_HBLOCK_MAX < keyWords ||
+	    keyWords < BF_KEY_HBLOCK_MIN) { // check keyword count
 		return SNAP_RETC_FAILURE;
 	}
     
@@ -109,21 +130,30 @@ snapu32_t action_setkey(snap_membus_t * hostMem_in, snapu64_t keyAddr, snapu32_t
 	return SNAP_RETC_SUCCESS;
 }
 
-snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
+static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
                             snap_membus_t * hostMem_out, snapu64_t outAddr,
                             snapu32_t dataBytes, snap_bool_t decrypt)
 {
     snapu64_t inLineAddr = inAddr >> ADDR_RIGHT_SHIFT;
     snapu64_t outLineAddr = outAddr >> ADDR_RIGHT_SHIFT;
     snapu32_t dataBlocks = dataBytes >> BF_BLOCK_BADR_BITS;
+
+#if 0 /* FIXME check if the condition is correct */
     if ((dataBlocks & BF_BLOCK_BADR_MASK) != 0) // check blockwidth alignment
     {
+	fprintf(stderr, "ERR: dataBytes=%d dataBlocks=%d BF_BLOCKSPERLINE=%d non correctly aligned!\n",
+		(int)dataBytes, (int)dataBlocks, BF_BLOCKSPERLINE);
         return SNAP_RETC_FAILURE;
     }
+#endif
 
     snapu32_t lineCount = dataBlocks / BF_BLOCKSPERLINE;
+    fprintf(stderr, "Processing lineCount=%d ...\n", (int)lineCount);
+
     for (snapu32_t lineOffset = 0; lineOffset < lineCount; ++lineOffset)
     {
+	fprintf(stderr, "Processing lineOffset=%d ...\n", (int)lineOffset);
+
         // fetch next line
         snap_membus_t line = hostMem_in[inLineAddr + lineOffset];
 
@@ -137,8 +167,10 @@ snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
         // blockwise processing
         for (snapu8_t blockOffset = 0; blockOffset < blockCount; ++blockOffset)
         {
-            bf_halfBlock_t left = line(blockOffset+BF_HBLOCKBITS, blockOffset + BF_BLOCKBITS-1);
-            bf_halfBlock_t right = line(blockOffset, blockOffset + BF_HBLOCKBITS-1);
+            bf_halfBlock_t left = line(blockOffset + BF_HBLOCKBITS,
+				       blockOffset + BF_BLOCKBITS-1);
+            bf_halfBlock_t right = line(blockOffset,
+					blockOffset + BF_HBLOCKBITS-1);
 
             if (decrypt)
                 bf_decrypt(left, right);
@@ -150,6 +182,7 @@ snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
         }
 
         // write processed line
+        print_line("write", line);
         hostMem_out[outLineAddr + lineOffset] = line;
     }
 
@@ -200,10 +233,12 @@ static snapu32_t process_action(snap_membus_t * din_gmem,
 		retc = action_setkey(din_gmem, inAddr, byteCount);
 		break;
 	case MODE_ENCRYPT:
-		retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr, byteCount, 0);
+		retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr,
+					byteCount, 0);
 		break;
 	case MODE_DECRYPT:
-		retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr, byteCount, 1);
+		retc = action_endecrypt(din_gmem, inAddr, dout_gmem, outAddr,
+					byteCount, 1);
 		break;
 	default:
 		break;
@@ -272,10 +307,18 @@ int main()
     static snap_membus_t dout_gmem[1024];
     action_reg act_reg;
     action_RO_config_reg act_config;
-    static const uint8_t ptext[] = { 0xff, 0xee, 0xdd, 0xcc,
-				     0xbb, 0xaa, 0x99, 0x88,
-				     0x77, 0x66, 0x55, 0x44,
-				     0x33, 0x22, 0x11, 0x00 };
+
+    /* FIXME let us try 64 bytes to get a full line as starter... */
+    static const uint8_t ptext[] = {
+	    0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /*  8 bytes */
+	    0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 16 bytes */
+	    0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /* 24 bytes */
+	    0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 32 bytes */
+	    0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /* 40 bytes */
+	    0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 48 bytes */
+	    0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /* 56 bytes */
+	    0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 64 bytes */
+    };
 
     act_reg.Control.flags = 0x0;
     hls_action(din_gmem, dout_gmem, &act_reg, &act_config);
@@ -299,7 +342,7 @@ int main()
     act_reg.Control.flags = 0x1;
     act_reg.Data.input_data.addr = 2 * sizeof(snap_membus_t);
     act_reg.Data.output_data.addr = 4 * sizeof(snap_membus_t);
-    act_reg.Data.data_length = 16;
+    act_reg.Data.data_length = sizeof(ptext);
     act_reg.Data.mode = MODE_ENCRYPT;
 
     hls_action(din_gmem, dout_gmem, &act_reg, &act_config);
