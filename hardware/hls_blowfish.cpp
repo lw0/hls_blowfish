@@ -330,6 +330,10 @@ int main()
     *(uint64_t *)(void *)&din_gmem[0] = 0x0706050403020100ull; // key 8 Byte at 0x0
     memcpy((uint8_t *)(void *)&din_gmem[2], ptext, sizeof(ptext)); // plaintext 16 Byte at 0x80
 
+    /* FIXME Why multiple calls? We could pass the key with the
+       encrypt/decrypt request to avoid hardware calls. But maybe
+       setting it once and streaming data is a good idea too. */
+
     fprintf(stderr, "// MODE_SET_KEY ciphertext 16 Byte at 0x100\n");
     act_reg.Control.flags = 0x1;
     act_reg.Data.input_data.addr = 0;
@@ -372,6 +376,8 @@ int main()
 		    cout << setw(4)  << i * sizeof(snap_membus_t) << ": "
 			 << setw(32) << hex << dout_gmem[i]
 			 << endl;
+
+    /* FIXME Memcmp() needed to check the correctness of the result */
 }
 
 #endif /* NO_SYNTH */
