@@ -110,9 +110,9 @@ static void snap_prepare_blowfish(struct snap_job *job,
     fprintf(stdout, "----------------  Config Space ----------- \n");
     fprintf(stdout, "mode = %d\n", mode_in);
     fprintf(stdout, "input_address = %p -> ",addr_in);
-    print_bytes((unsigned char*) addr_in, data_length_in);
+    print_bytes((unsigned char*) addr_in, 128);
     fprintf(stdout, "output_address = %p -> ", addr_out);
-    print_bytes((unsigned char*) addr_out, data_length_in);
+    print_bytes((unsigned char*) addr_out, 128);
     fprintf(stdout, "data_length = %d\n", data_length_in);
     fprintf(stdout, "------------------------------------------ \n");
 
@@ -232,16 +232,17 @@ static void blowfish_operation(unsigned char* data, unsigned int length, unsigne
             print_bytes(data, length);
             break;
         case MODE_ENCRYPT:
-            fprintf(stdout, "Plaintext is at %p -> ", (void * )bjob_in.input_data.addr);
-            print_bytes((unsigned char*) bjob_in.input_data.addr, bjob_in.data_length);
-            fprintf(stdout, "Cipher is at %p -> ", (void *)bjob_in.output_data.addr);
-            print_bytes((unsigned char*) bjob_in.output_data.addr, bjob_in.data_length);
+            fprintf(stdout, "Plaintext is at %p -> ", (void * )bjob_out.input_data.addr);
+            print_bytes((unsigned char*) bjob_out.input_data.addr, 128);
+            fprintf(stdout, "Cipher is at %p -> ", (void *)bjob_out.output_data.addr);
+            fprintf(stdout, "Cipher is at %p -> ", (void *)obuf);
+            print_bytes((unsigned char*) obuf, 128);
             break;
         case MODE_DECRYPT:
-            fprintf(stdout, "Cipher is at %p -> ", (void *)bjob_in.input_data.addr);
-            print_bytes((unsigned char*) bjob_in.input_data.addr, bjob_in.data_length);
-            fprintf(stdout, "Plaintext is at %p -> ", (void *)bjob_in.output_data.addr);
-            print_bytes((unsigned char*) bjob_in.output_data.addr, bjob_in.data_length);
+            fprintf(stdout, "Cipher is at %p -> ", (void *)bjob_out.input_data.addr);
+            print_bytes((unsigned char*) bjob_out.input_data.addr, 128);
+            fprintf(stdout, "Plaintext is at %p -> ", (void *)bjob_out.output_data.addr);
+            print_bytes((unsigned char*) bjob_out.output_data.addr, 128);
             break;
     }
     snap_detach_action(action);
