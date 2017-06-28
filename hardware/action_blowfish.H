@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-#include "hls_snap.H"
+#include <hls_snap.H>
 #include <action_blowfish.h> /*BFS job definition*/
 
 #define BF_BLOCKBITS 64
