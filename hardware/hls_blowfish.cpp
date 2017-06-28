@@ -156,7 +156,8 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
         snap_membus_t line = hostMem_in[inLineAddr + lineOffset];
 
         // determine number of valid blocks in line
-        snapu8_t blockCount = dataBlocks - (lineOffset * BF_BLOCKSPERLINE);
+        snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
+        snapu8_t blockCount = dataBlocks - blocksDone;
         if (blockCount > BF_BLOCKSPERLINE)
         {
             blockCount = BF_BLOCKSPERLINE;
@@ -165,18 +166,18 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
         // blockwise processing
         for (snapu8_t blockOffset = 0; blockOffset < blockCount; ++blockOffset)
         {
-            bf_halfBlock_t left = line(blockOffset + BF_HBLOCKBITS,
-				       blockOffset + BF_BLOCKBITS-1);
-            bf_halfBlock_t right = line(blockOffset,
-					blockOffset + BF_HBLOCKBITS-1);
+            bf_halfBlock_t left =
+            	line(blockOffset * BF_BLOCKBITS + BF_HBLOCKBITS, blockOffset * BF_BLOCKBITS + BF_BLOCKBITS-1);
+            bf_halfBlock_t right =
+            	line(blockOffset * BF_BLOCKBITS,                 blockOffset * BF_BLOCKBITS + BF_HBLOCKBITS-1);
 
             if (decrypt)
                 bf_decrypt(left, right);
             else
                 bf_encrypt(left, right);
 
-            line(blockOffset+BF_HBLOCKBITS, blockOffset + BF_BLOCKBITS-1) = left;
-            line(blockOffset, blockOffset + BF_HBLOCKBITS-1) = right;
+            line(blockOffset * BF_BLOCKBITS + BF_HBLOCKBITS, blockOffset * BF_BLOCKBITS + BF_BLOCKBITS-1) = left;
+            line(blockOffset * BF_BLOCKBITS,                 blockOffset * BF_BLOCKBITS + BF_HBLOCKBITS-1) = right;
         }
 
         // write processed line
