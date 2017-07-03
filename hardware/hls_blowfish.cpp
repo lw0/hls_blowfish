@@ -31,12 +31,90 @@ static void print_line(const char *msg, snap_membus_t line)
 #endif
 }
 
-static bf_halfBlock_t bf_bswap(bf_halfBlock_t h)
+static bf_halfBlock_t bf_lineToHBlock(const snap_membus_t & line, unsigned firstByte)
 {
-	return  ((h >> 24) & 0x000000ff) |
-			((h >>  8) & 0x0000ff00) |
-			((h <<  8) & 0x00ff0000) |
-			((h << 24) & 0xff000000);
+	bf_halfBlock_t h = 0;
+	// big endian
+	h |= line.range(firstByte*8 +  7, firstByte*8 +  0) << 24;
+	h |= line.range(firstByte*8 + 15, firstByte*8 +  8) << 16;
+	h |= line.range(firstByte*8 + 23, firstByte*8 + 16) <<  8;
+	h |= line.range(firstByte*8 + 31, firstByte*8 + 24) <<  0;
+
+	// little endian
+//	h |= line.range(firstByte*8 +  7, firstByte*8 +  0) <<  0;
+//	h |= line.range(firstByte*8 + 15, firstByte*8 +  8) <<  8;
+//	h |= line.range(firstByte*8 + 23, firstByte*8 + 16) << 16;
+//	h |= line.range(firstByte*8 + 31, firstByte*8 + 24) << 24;
+
+	return h;
+}
+
+static void bf_hBlockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBlock_t h)
+{
+	// big endian
+//	line.range(firstByte*8 +  7, firstByte*8 +  0) = (h >> 24) & 0xff;
+//	line.range(firstByte*8 + 15, firstByte*8 +  8) = (h >> 16) & 0xff;
+//	line.range(firstByte*8 + 23, firstByte*8 + 16) = (h >>  8) & 0xff;
+//	line.range(firstByte*8 + 31, firstByte*8 + 24) = (h >>  0) & 0xff;
+
+	// little endian
+	line.range(firstByte*8 +  7, firstByte*8 +  0) = (h >>  0) & 0xff;
+	line.range(firstByte*8 + 15, firstByte*8 +  8) = (h >>  8) & 0xff;
+	line.range(firstByte*8 + 23, firstByte*8 + 16) = (h >> 16) & 0xff;
+	line.range(firstByte*8 + 31, firstByte*8 + 24) = (h >> 24) & 0xff;
+}
+
+
+static void bf_lineToBlock(const snap_membus_t & line, unsigned firstByte, bf_halfBlock_t & l, bf_halfBlock_t & r)
+{
+	l = 0;
+	r = 0;
+	// big endian
+	l |= line.range(firstByte*8 +  7, firstByte*8 +  0) << 24;
+	l |= line.range(firstByte*8 + 15, firstByte*8 +  8) << 16;
+	l |= line.range(firstByte*8 + 23, firstByte*8 + 16) <<  8;
+	l |= line.range(firstByte*8 + 31, firstByte*8 + 24) <<  0;
+
+	r |= line.range(firstByte*8 + 39, firstByte*8 + 32) << 24;
+	r |= line.range(firstByte*8 + 47, firstByte*8 + 40) << 16;
+	r |= line.range(firstByte*8 + 55, firstByte*8 + 48) <<  8;
+	r |= line.range(firstByte*8 + 63, firstByte*8 + 56) <<  0;
+
+	// little endian
+//	l |= line.range(firstByte*8 +  7, firstByte*8 +  0) <<  0;
+//	l |= line.range(firstByte*8 + 15, firstByte*8 +  8) <<  8;
+//	l |= line.range(firstByte*8 + 23, firstByte*8 + 16) << 16;
+//	l |= line.range(firstByte*8 + 31, firstByte*8 + 24) << 24;
+//
+//	r |= line.range(firstByte*8 + 39, firstByte*8 + 32) <<  0;
+//	r |= line.range(firstByte*8 + 47, firstByte*8 + 40) <<  8;
+//	r |= line.range(firstByte*8 + 55, firstByte*8 + 48) << 16;
+//	r |= line.range(firstByte*8 + 63, firstByte*8 + 56) << 24;
+}
+
+static void bf_blockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBlock_t l, bf_halfBlock_t r)
+{
+	// big endian
+	line.range(firstByte*8 +  7, firstByte*8 +  0) = (l >> 24) & 0xff;
+	line.range(firstByte*8 + 15, firstByte*8 +  8) = (l >> 16) & 0xff;
+	line.range(firstByte*8 + 23, firstByte*8 + 16) = (l >>  8) & 0xff;
+	line.range(firstByte*8 + 31, firstByte*8 + 24) = (l >>  0) & 0xff;
+
+	line.range(firstByte*8 + 39, firstByte*8 + 32) = (r >> 24) & 0xff;
+	line.range(firstByte*8 + 47, firstByte*8 + 40) = (r >> 16) & 0xff;
+	line.range(firstByte*8 + 55, firstByte*8 + 48) = (r >>  8) & 0xff;
+	line.range(firstByte*8 + 63, firstByte*8 + 56) = (r >>  0) & 0xff;
+
+	// little endian
+//	line.range(firstByte*8 +  7, firstByte*8 +  0) = (l >>  0) & 0xff;
+//	line.range(firstByte*8 + 15, firstByte*8 +  8) = (l >>  8) & 0xff;
+//	line.range(firstByte*8 + 23, firstByte*8 + 16) = (l >> 16) & 0xff;
+//	line.range(firstByte*8 + 31, firstByte*8 + 24) = (l >> 24) & 0xff;
+//
+//	line.range(firstByte*8 + 39, firstByte*8 + 32) = (r >>  0) & 0xff;
+//	line.range(firstByte*8 + 47, firstByte*8 + 40) = (r >>  8) & 0xff;
+//	line.range(firstByte*8 + 55, firstByte*8 + 48) = (r >> 16) & 0xff;
+//	line.range(firstByte*8 + 63, firstByte*8 + 56) = (r >> 24) & 0xff;
 }
 
 static bf_halfBlock_t bf_f(bf_halfBlock_t h)
@@ -88,15 +166,12 @@ static void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
     printf(" -> 0x%08x, 0x%08x\n", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right));
 }
 
-static void bf_keyInit(snap_membus_t key, snapu8_t keyWords)
+static void bf_keyInit(bf_halfBlock_t key[18])
 {
 	printf("bf_keyInit() <- \n");
     for (int i = 0; i < 18; ++i)
     {
-        bf_halfBlock_t keyWord = key((i%keyWords)*32+31,(i%keyWords)*32);
-        //keyWord = bf_bswap(keyWord);
-        printf("%d : 0x%08x\n", i, *((uint32_t *)(void *)&keyWord));
-        g_P[i] = c_initP[i] ^ keyWord;
+        g_P[i] = c_initP[i] ^ key[i];
     }
     for (int n = 0; n < 4; ++n)
     {
@@ -134,12 +209,19 @@ static snapu32_t action_setkey(snap_membus_t * hostMem_in,
 	    keyWords < BF_KEY_HBLOCK_MIN) { // check keyword count
 		return SNAP_RETC_FAILURE;
 	}
-    
+
 	// key fits in a single line, fetch it
 	snap_membus_t keyLine = hostMem_in[keyLineAddr];
     
-	// cast line to keyword granularity, initialize g_S, and g_P arrays
-	bf_keyInit(keyLine, keyWords);
+	bf_halfBlock_t key[18];
+	for (int i = 0; i < 18; ++i)
+	{
+		key[i] = bf_lineToHBlock(keyLine, (i % keyWords.to_int()) * 4);
+		printf("%d : 0x%08x\n", i, *((uint32_t *)(void *)&key[i]));
+	}
+
+	// initialize g_S, and g_P arrays
+	bf_keyInit(key);
 
 	return SNAP_RETC_SUCCESS;
 }
@@ -182,8 +264,10 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
         for (snapu8_t blockOffset = 0; blockOffset < blockCount; ++blockOffset)
         {
         	snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS;
-            bf_halfBlock_t right =  line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS);
-            bf_halfBlock_t left = line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0);
+        	//bf_halfBlock_t right =  line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS);
+			//bf_halfBlock_t left = line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0);
+            bf_halfBlock_t left, right;
+            bf_lineToBlock(line, blockOffset * 8, left, right);
 
             //left = bf_bswap(left);
             //right = bf_bswap(right);
@@ -196,8 +280,9 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
             //left = bf_bswap(left);
 			//right = bf_bswap(right);
 
-            line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS) = right;
-            line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0) = left;
+            bf_blockToLine(line, blockOffset * 8, left, right);
+            //line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS) = right;
+            //line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0) = left;
         }
 
         // write processed line
@@ -267,8 +352,8 @@ void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
     // Host Memory AXI Interface
 #pragma HLS INTERFACE m_axi port=din_gmem bundle=host_mem offset=slave depth=512
 #pragma HLS INTERFACE m_axi port=dout_gmem bundle=host_mem offset=slave depth=512
-#pragma HLS INTERFACE s_axilite port=din_gmem bundle=ctrl_reg 		offset=0x030
-#pragma HLS INTERFACE s_axilite port=dout_gmem bundle=ctrl_reg 		offset=0x040
+#pragma HLS INTERFACE s_axilite port=din_gmem bundle=ctrl_reg offset=0x030
+#pragma HLS INTERFACE s_axilite port=dout_gmem bundle=ctrl_reg offset=0x040
 
     // Host Memory AXI Lite Master Interface
 #pragma HLS DATA_PACK variable=Action_Config
