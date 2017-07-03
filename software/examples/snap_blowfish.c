@@ -10,7 +10,8 @@
  */
 
 /*
- * Copyright 2017, International Business Machines
+ * Copyright 2017 International Business Machines
+ * Copyright 2017 Lukas Wenzel, HPI
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +42,8 @@
 #include <action_blowfish.h>
 #include <snap_hls_if.h>
 
+static const char *version = GIT_VERSION;
+int verbose_flag = 0;
 
 /*
  * BFS: breadth first search
@@ -71,14 +74,27 @@
  *
  */
 
-int verbose_flag = 0;
-
 /*---------------------------------------------------
  *       Sample Data
  *---------------------------------------------------*/
 
-static unsigned char example_plaintext[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
-static unsigned char example_key[] = { 0x00, 0x11, 0x22 , 0x33, 0x44, 0x55, 0x66, 0x77};
+/*
+ * FIXME If you like to use those pointers directly, use an gcc's alignment
+ *       attributes and ensure that it is 64 byte aligned.
+ *
+ * E.g. like this:
+ *   __attribute__((aligned(64)));
+ */
+static unsigned char example_plaintext[] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+	0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
+};
+
+static unsigned char example_key[] = {
+	0x00, 0x11, 0x22 , 0x33, 0x44, 0x55, 0x66, 0x77
+};
 
 static void print_bytes(unsigned char* bytes, unsigned int length)
 {
@@ -102,7 +118,6 @@ static void snap_prepare_blowfish(struct snap_job *job,
         blowfish_job_t *bjob_out,
         void *addr_in,
         uint16_t type_in,
-
         void *addr_out,
         uint16_t type_out)
 {
@@ -116,10 +131,10 @@ static void snap_prepare_blowfish(struct snap_job *job,
     fprintf(stdout, "data_length = %d\n", data_length_in);
     fprintf(stdout, "------------------------------------------ \n");
 
-    snap_addr_set(&bjob_in->input_data, addr_in, 0,
+    snap_addr_set(&bjob_in->input_data, addr_in, data_length_in,
             type_in, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_SRC);
 
-    snap_addr_set(&bjob_in->output_data, addr_out, 0,
+    snap_addr_set(&bjob_in->output_data, addr_out, data_length_in,
             type_out, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST | SNAP_ADDRFLAG_END );
 
     bjob_in->mode = mode_in;
@@ -135,31 +150,35 @@ static void snap_prepare_blowfish(struct snap_job *job,
  *       MAIN
  *---------------------------------------------------*/
 
-static void blowfish_operation(unsigned char* data, unsigned int length, unsigned int mode) {
+static void blowfish_operation(int card_no,
+			       unsigned long timeout,
+			       unsigned char* data,
+			       unsigned int length,
+			       unsigned int mode)
+{
     // input validation
     if (mode == MODE_SET_KEY) {
         if (length < 4 || length > 56 || length % 4 != 0) {
-            printf("err: key has to be multiple of 4 bytes with a length between 4 and 56 bytes!\n");
+            printf("err: key has to be multiple of 4 bytes with a length "
+		   "between 4 and 56 bytes!\n");
             goto input_error;
         }
     }
     if (mode == MODE_ENCRYPT || mode == MODE_DECRYPT) {
         if (length % 8 != 0 || length <= 0) {
-            printf("err: data to en- or decrypt has to be multiple of 8 bytes and at least 8 bytes long!\n");
+            printf("err: data to en- or decrypt has to be multiple of "
+		   "8 bytes and at least 8 bytes long!\n");
             goto input_error;
         }
     }
 
     int rc = 0;
-    int card_no = 0;
     struct snap_card *card = NULL;
     struct snap_action *action = NULL;
     char device[128];
     struct snap_job job;
     struct timeval etime, stime;
     uint32_t page_size = sysconf(_SC_PAGESIZE);
-
-    unsigned long timeout = 10000;
     snap_action_flag_t action_irq = 0;
 
     //Action specfic
@@ -177,12 +196,18 @@ static void blowfish_operation(unsigned char* data, unsigned int length, unsigne
     // allocate multiple of cacheline size (128 byte)
     unsigned int in_size = (length/128 + 1) * 128;
     unsigned int out_size = 0;
+
     if (mode == MODE_ENCRYPT || mode == MODE_DECRYPT) {
         out_size = in_size;
     }
 
+    /* FIXME Always check memalign return code! */
     ibuf = memalign(page_size, in_size);
-    memcpy(ibuf, data, length); // TODO check if neccessary, or if data[] could directly be used
+    memcpy(ibuf, data, length);
+
+    // TODO check if neccessary, or if data[] could directly be used
+    // data can only be used if it is aligned properly.
+
     obuf = memalign(page_size, out_size);
 
     //////////////////////////////////////////////////////////////////////
@@ -263,14 +288,99 @@ input_error:
     exit(EXIT_FAILURE);
 }
 
+/**
+ * @brief       Print valid command line options
+ * @param prog  Current program name
+ */
+static void usage(const char *prog)
+{
+        printf("Usage: %s [-h] [-v, --verbose] [-V, --version]\n"
+               "  -C, --card <cardno> can be (0...3)\n"
+               "  -i, --input <file.bin>    input file.\n"
+               "  -o, --output <file.bin>   output file.\n"
+	       "  -c, --crypt\n"
+	       "  -d, --decrypt\n"
+               "  -t, --timeout             Timeout in sec to wait for donen"
+               "\n"
+               "Example:\n"
+               "  snap_blowfish ...\n"
+               "\n",
+               prog);
+}
+
 int main(int argc, char *argv[])
 {
-    //General variables for snap call
-    argc = argc;
-    argv = argv;
-    //print_bytes(example_plaintext, sizeof(example_plaintext));
+        int card_no = 0;
+	int decrypt = 0;
+	const char *input = NULL;
+        const char *output = NULL;
+        unsigned long timeout = 10000;
+	int ch;
 
-    blowfish_operation(example_key, sizeof(example_key), MODE_SET_KEY);
-    blowfish_operation(example_plaintext, sizeof(example_plaintext), MODE_ENCRYPT);
-    exit(0);
+        while (1) {
+                int option_index = 0;
+                static struct option long_options[] = {
+                        { "card",        required_argument, NULL, 'C' },
+                        { "input",       required_argument, NULL, 'i' },
+                        { "output",      required_argument, NULL, 'o' },
+                        { "decrypt",     no_argument,       NULL, 'd' },
+                        { "timeout",     required_argument, NULL, 't' },
+                        { "version",     no_argument,       NULL, 'V' },
+                        { "verbose",     no_argument,       NULL, 'v' },
+                        { "help",        no_argument,       NULL, 'h' },
+                        { 0,             no_argument,       NULL, 0   },
+                };
+
+                ch = getopt_long(argc, argv, "C:i:o:dt:Vvh",
+                                 long_options, &option_index);
+                if (ch == -1)
+                        break;
+
+                switch (ch) {
+                case 'C':
+                        card_no = strtol(optarg, (char **)NULL, 0);
+                        break;
+                case 'i':
+                        input = optarg;
+                        break;
+                case 'o':
+                        output = optarg;
+                        break;
+		case 'd':
+			decrypt = 1;
+			break;
+                case 't':
+                        timeout = strtol(optarg, (char **)NULL, 0);
+                        break;
+                case 'V':
+                        printf("%s\n", version);
+                        exit(EXIT_SUCCESS);
+                case 'v':
+                        verbose_flag++;
+                        break;
+                case 'h':
+                        usage(argv[0]);
+                        exit(EXIT_SUCCESS);
+                        break;
+                default:
+                        usage(argv[0]);
+                        exit(EXIT_FAILURE);
+                }
+	}
+
+	fprintf(stderr,	"Blowfish Cypher\n"
+		"  operation: %s\n"
+		"  input: %s\n"
+		"  output: %s\n",
+		decrypt ? "decrypt" : "encrypt", input, output);
+
+	if (verbose_flag)
+		print_bytes(example_plaintext, sizeof(example_plaintext));
+
+	blowfish_operation(card_no, timeout, example_key, sizeof(example_key),
+			   MODE_SET_KEY);
+	blowfish_operation(card_no, timeout, example_plaintext, sizeof(example_plaintext),
+			   MODE_ENCRYPT);
+
+	exit(EXIT_SUCCESS);
 }

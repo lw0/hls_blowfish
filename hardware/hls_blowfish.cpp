@@ -468,8 +468,16 @@ int main()
 	for (unsigned int i = 0; i < act_reg.Data.data_length; ++i) {
 		printf("%02x ", plainD[i]);
 	}
+	printf("\n");
 
     /* FIXME Memcmp() needed to check the correctness of the result */
+	if (memcmp(plainE, plainD, sizeof(ptext)) != 0) {
+		printf("Well, something is wrong, please investigate!\n");
+		return -1;
+	}
+
+	printf("Super the data is the same!\n");
+	return 0;
 }
 
 #endif /* NO_SYNTH */
