@@ -83,20 +83,24 @@ int verbose_flag = 0;
  *       attributes and ensure that it is 64 byte aligned.
  *
  * E.g. like this:
- *   __attribute__((aligned(64)));
+ *   __attribute__((align(64)));
  */
-static unsigned char example_plaintext[] = {
-	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-	0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
+static const uint8_t example_plaintext[] __attribute__((aligned(64))) = {
+	0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /*  8 bytes */
+	0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 16 bytes */
+	0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /* 24 bytes */
+	0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 32 bytes */
+	0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /* 40 bytes */
+	0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 48 bytes */
+	0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /* 56 bytes */
+	0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 64 bytes */
 };
 
-static unsigned char example_key[] = {
+static unsigned char example_key[] __attribute__((aligned(64))) = {
 	0x00, 0x11, 0x22 , 0x33, 0x44, 0x55, 0x66, 0x77
 };
 
-static void print_bytes(unsigned char* bytes, unsigned int length)
+static void print_bytes(const uint8_t *bytes, unsigned int length)
 {
     unsigned int i =0;
     while (i < length)
@@ -121,15 +125,17 @@ static void snap_prepare_blowfish(struct snap_job *job,
         void *addr_out,
         uint16_t type_out)
 {
+    static const char *mode_str[] = 
+	    { "MODE_SET_KEY", "MODE_ENCRYPT", "MODE_DECRYPT" };
 
-    fprintf(stdout, "----------------  Config Space ----------- \n");
-    fprintf(stdout, "mode = %d\n", mode_in);
-    fprintf(stdout, "input_address = %p -> ",addr_in);
+    fprintf(stderr, "----------------  Config Space ----------- \n");
+    fprintf(stderr, "mode = %d %s\n", mode_in, mode_str[mode_in % 3]);
+    fprintf(stderr, "input_address = %p -> ",addr_in);
     print_bytes((unsigned char*) addr_in, 128);
-    fprintf(stdout, "output_address = %p -> ", addr_out);
+    fprintf(stderr, "output_address = %p -> ", addr_out);
     print_bytes((unsigned char*) addr_out, 128);
-    fprintf(stdout, "data_length = %d\n", data_length_in);
-    fprintf(stdout, "------------------------------------------ \n");
+    fprintf(stderr, "data_length = %d\n", data_length_in);
+    fprintf(stderr, "------------------------------------------ \n");
 
     snap_addr_set(&bjob_in->input_data, addr_in, data_length_in,
             type_in, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_SRC);
@@ -152,7 +158,7 @@ static void snap_prepare_blowfish(struct snap_job *job,
 
 static void blowfish_operation(int card_no,
 			       unsigned long timeout,
-			       unsigned char* data,
+			       const uint8_t *data,
 			       unsigned int length,
 			       unsigned int mode)
 {
@@ -270,6 +276,13 @@ static void blowfish_operation(int card_no,
             print_bytes((unsigned char*) bjob_out.output_data.addr, 128);
             break;
     }
+
+    fprintf(stderr, "Input Buffer:\n");
+    __hexdump(stderr, ibuf, in_size);
+
+    fprintf(stderr, "Output Buffer:\n");
+    __hexdump(stderr, obuf, out_size);
+
     snap_detach_action(action);
     snap_card_free(card);
     free(ibuf);
