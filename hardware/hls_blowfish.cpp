@@ -129,8 +129,10 @@ static bf_halfBlock_t bf_f(bf_halfBlock_t h)
 static void bf_encrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
 {
 	printf("bf_encrypt(0x%08x, 0x%08x)", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right));
-    for (int i = 0; i < 16; i += 2)
-    {
+
+BF_ENCRYPT:
+    for (int i = 0; i < 16; i += 2) {
+#pragma HLS_UNROLL factor=16
         left ^= g_P[i];
         right ^= bf_f(left);
         right ^= g_P[i+1];
@@ -149,8 +151,10 @@ static void bf_encrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
 static void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
 {
 	printf("bf_decrypt(0x%08x, 0x%08x)", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right));
-    for (int i = 16; i > 0; i -= 2)
-    {
+
+BF_DECRYPT:
+	for (int i = 16; i > 0; i -= 2) {
+#pragma HLS_UNROLL factor=16
         left ^= g_P[i+1];
         right ^= bf_f(left);
         right ^= g_P[i];
@@ -169,20 +173,16 @@ static void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
 static void bf_keyInit(bf_halfBlock_t key[18])
 {
 	printf("bf_keyInit() <- \n");
-    for (int i = 0; i < 18; ++i)
-    {
+    for (int i = 0; i < 18; ++i) {
         g_P[i] = c_initP[i] ^ key[i];
     }
-    for (int n = 0; n < 4; ++n)
-    {
-        for (int i = 0; i < 256; ++i)
-        {
+    for (int n = 0; n < 4; ++n) {
+        for (int i = 0; i < 256; ++i) {
             g_S[n][i] = c_initS[n][i];
         }
     }
     bf_halfBlock_t left = 0, right = 0;
-    for (int i = 0; i < 18; i += 2)
-    {
+    for (int i = 0; i < 18; i += 2) {
         bf_encrypt(left, right);
         g_P[i] = left;
         g_P[i+1] = right;

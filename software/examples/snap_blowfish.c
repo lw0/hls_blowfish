@@ -105,7 +105,7 @@ static uint8_t example_decrypted[64] __attribute__((aligned(64))) = {
 	0x00,
 };
 
-static unsigned char example_key[] __attribute__((aligned(64))) = {
+static uint8_t example_key[] __attribute__((aligned(64))) = {
 	0x00, 0x11, 0x22 , 0x33, 0x44, 0x55, 0x66, 0x77
 };
 
@@ -171,7 +171,7 @@ static void snap_prepare_blowfish(struct snap_job *job,
  *---------------------------------------------------*/
 
 static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
-			    const uint8_t *data, unsigned int length)
+			    const uint8_t *key, unsigned int length)
 {
 	int rc = 0;
 	struct timeval etime, stime;
@@ -186,7 +186,7 @@ static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
         }
 	
 	snap_prepare_blowfish(&job, MODE_SET_KEY, length, &bjob_in, NULL,
-			      data, SNAP_ADDRTYPE_HOST_DRAM,
+			      key, SNAP_ADDRTYPE_HOST_DRAM,
 			      NULL, SNAP_ADDRTYPE_UNUSED);
 
 	fprintf(stderr, "INFO: Timer starts...\n");
@@ -202,9 +202,10 @@ static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
 	fprintf(stderr, "RETC=%x\n", job.retc);
 	fprintf(stderr, "INFO: Blowfish took %lld usec\n",
 		(long long)timediff_usec(&etime, &stime));
+
 	fprintf(stderr, "------------------------------------------ \n");
 	fprintf(stderr, "Key set to:\n");
-	__hexdump(stderr, data, length);
+	__hexdump(stderr, key, length);
 
 	return 0;
 
@@ -247,17 +248,8 @@ static int blowfish_cypher(struct snap_action *action,
 	fprintf(stderr, "RETC=%x\n", job.retc);
 	fprintf(stderr, "INFO: Blowfish took %lld usec\n",
 		(long long)timediff_usec(&etime, &stime));
+
 	fprintf(stderr, "------------------------------------------ \n");
-
-	/*
-        case MODE_DECRYPT:
-            fprintf(stderr, "Cipher is at %p -> ", (void *)bjob_out.input_data.addr);
-            print_bytes((unsigned char*) bjob_out.input_data.addr, 128);
-            fprintf(stderr, "Plaintext is at %p -> ", (void *)bjob_out.output_data.addr);
-            print_bytes((unsigned char*) bjob_out.output_data.addr, 128);
-            break;
-	*/
-
 	fprintf(stderr, "Input Buffer:\n");
 	__hexdump(stderr, ibuf, in_len);
 	fprintf(stderr, "Output Buffer:\n");
@@ -268,6 +260,106 @@ static int blowfish_cypher(struct snap_action *action,
 	return -EIO;
 }
 
+static inline
+ssize_t file_size(const char *fname)
+{
+        int rc;
+        struct stat s;
+
+        rc = lstat(fname, &s);
+        if (rc != 0) {
+                fprintf(stderr, "err: Cannot find %s!\n", fname);
+                return rc;
+        }
+        return s.st_size;
+}
+
+static inline ssize_t
+file_read(const char *fname, uint8_t *buff, size_t len)
+{
+        int rc;
+        FILE *fp;
+
+        if ((fname == NULL) || (buff == NULL) || (len == 0))
+                return -EINVAL;
+
+        fp = fopen(fname, "r");
+        if (!fp) {
+                fprintf(stderr, "err: Cannot open file %s: %s\n",
+                        fname, strerror(errno));
+                return -ENODEV;
+        }
+        rc = fread(buff, len, 1, fp);
+        if (rc == -1) {
+                fprintf(stderr, "err: Cannot read from %s: %s\n",
+                        fname, strerror(errno));
+                fclose(fp);
+                return -EIO;
+        }
+
+        fclose(fp);
+        return rc;
+}
+
+static inline ssize_t
+file_write(const char *fname, const uint8_t *buff, size_t len)
+{
+        int rc;
+        FILE *fp;
+
+        if ((fname == NULL) || (buff == NULL) || (len == 0))
+                return -EINVAL;
+
+        fp = fopen(fname, "w+");
+        if (!fp) {
+                fprintf(stderr, "err: Cannot open file %s: %s\n",
+                        fname, strerror(errno));
+                return -ENODEV;
+        }
+        rc = fwrite(buff, len, 1, fp);
+        if (rc == -1) {
+                fprintf(stderr, "err: Cannot write to %s: %s\n",
+                        fname, strerror(errno));
+                fclose(fp);
+                return -EIO;
+        }
+
+        fclose(fp);
+        return rc;
+}
+
+static int blowfish_test(struct snap_action *action, unsigned long timeout)
+{
+	int rc;
+
+	/* Set a key */
+	rc = blowfish_set_key(action, timeout, example_key, sizeof(example_key));
+	if (rc != 0)
+		return -1;
+
+	/* Encrypt data */
+	rc = blowfish_cypher(action, MODE_ENCRYPT, timeout,
+			     example_plaintext, sizeof(example_plaintext),
+			     example_encrypted, sizeof(example_encrypted));
+	if (rc != 0)
+		return -2;
+
+	/* Decrypt data */
+	rc = blowfish_cypher(action, MODE_DECRYPT, timeout,
+			     example_encrypted, sizeof(example_encrypted),
+			     example_decrypted, sizeof(example_decrypted));
+	if (rc != 0)
+		return -3;
+
+	/* Verification */
+	if (memcmp(example_plaintext, example_decrypted,
+		   sizeof(example_plaintext)) != 0) {
+		fprintf(stderr, "ERROR: Data does not match!!\n");
+		return -4;
+	}
+	return 0;
+}
+
 /**
  * @brief       Print valid command line options
  * @param prog  Current program name
@@ -276,11 +368,12 @@ static void usage(const char *prog)
 {
         printf("Usage: %s [-h] [-v, --verbose] [-V, --version]\n"
                "  -C, --card <cardno> can be (0...3)\n"
-               "  -i, --input <file.bin>    input file.\n"
-               "  -o, --output <file.bin>   output file.\n"
+               "  -i, --input <file.bin>    input\n"
+               "  -o, --output <file.bin>   output\n"
+               "  -k, --key <file.bin>      key\n"
 	       "  -c, --crypt\n"
 	       "  -d, --decrypt\n"
-               "  -t, --timeout             Timeout in sec to wait for donen"
+               "  -t, --timeout             timeout (sec)"
                "\n"
                "Example:\n"
                "  snap_blowfish ...\n"
@@ -292,9 +385,13 @@ int main(int argc, char *argv[])
 {
 	int rc;
         int card_no = 0;
-	int decrypt = 0;
 	const char *input = NULL;
         const char *output = NULL;
+	const char *key = NULL;
+	uint8_t *ibuf = NULL, *obuf = NULL, *kbuf = NULL;
+	size_t ilen, klen;
+	int decrypt = 0;
+	int test = 0;
         unsigned long timeout = 10000;
 	struct snap_card *card = NULL;
 	struct snap_action *action = NULL;
@@ -308,6 +405,8 @@ int main(int argc, char *argv[])
                         { "card",        required_argument, NULL, 'C' },
                         { "input",       required_argument, NULL, 'i' },
                         { "output",      required_argument, NULL, 'o' },
+                        { "key",         required_argument, NULL, 'k' },
+			{ "test",        no_argument,       NULL, 'T' },
                         { "decrypt",     no_argument,       NULL, 'd' },
                         { "timeout",     required_argument, NULL, 't' },
                         { "version",     no_argument,       NULL, 'V' },
@@ -316,7 +415,7 @@ int main(int argc, char *argv[])
                         { 0,             no_argument,       NULL, 0   },
                 };
 
-                ch = getopt_long(argc, argv, "C:i:o:dt:Vvh",
+                ch = getopt_long(argc, argv, "C:i:o:k:Tdt:Vvh",
                                  long_options, &option_index);
                 if (ch == -1)
                         break;
@@ -331,6 +430,12 @@ int main(int argc, char *argv[])
                 case 'o':
                         output = optarg;
                         break;
+                case 'k':
+                        key = optarg;
+                        break;
+		case 'T':
+			test = 1;
+			break;
 		case 'd':
 			decrypt = 1;
 			break;
@@ -356,12 +461,12 @@ int main(int argc, char *argv[])
 	fprintf(stderr,	"Blowfish Cypher\n"
 		"  operation: %s\n"
 		"  input: %s\n"
-		"  output: %s\n",
-		decrypt ? "decrypt" : "encrypt", input, output);
+		"  output: %s\n"
+		"  key: %s\n",
+		decrypt ? "decrypt" : "encrypt", input, output, key);
 
 	if (verbose_flag)
 		print_bytes(example_plaintext, sizeof(example_plaintext));
-
 
 	//////////////////////////////////////////////////////////////////////
 
@@ -382,35 +487,70 @@ int main(int argc, char *argv[])
 		goto out_error1;
 	}
 
-	/* Set a key */
-	rc = blowfish_set_key(action, timeout, example_key, sizeof(example_key));
-	if (rc != 0)
-		goto out_error2;
-
-	/* Encrypt data */
-	rc = blowfish_cypher(action, MODE_ENCRYPT, timeout,
-			     example_plaintext, sizeof(example_plaintext),
-			     example_encrypted, sizeof(example_encrypted));
-	if (rc != 0)
-		goto out_error2;
-
-	/* Decrypt data */
-	rc = blowfish_cypher(action, MODE_DECRYPT, timeout,
-			     example_encrypted, sizeof(example_encrypted),
-			     example_decrypted, sizeof(example_decrypted));
-	if (rc != 0)
-		goto out_error2;
-
-	if (memcmp(example_plaintext, example_decrypted,
-		   sizeof(example_plaintext)) != 0) {
-		fprintf(stderr, "ERROR: Data does not match!!\n");
-		goto out_error2;
+	if (test) {
+		rc = blowfish_test(action, timeout);
+		if (rc == 0)
+			goto go_home;
+		else
+			goto out_error3;
 	}
+
+	ilen = file_size(input);
+	if (ilen <= 0)
+		goto out_error2;
+
+	klen = file_size(key);
+	if (klen <= 0)
+		goto out_error2;
+
+	ibuf = snap_malloc(ilen);
+	if (ibuf == NULL)
+		goto out_error3;
+
+	obuf = snap_malloc(ilen);
+	if (obuf == NULL)
+		goto out_error3;
+
+	kbuf = snap_malloc(klen);
+	if (kbuf == NULL)
+		goto out_error3;
+
+	rc = file_read(input, ibuf, ilen);
+	if (rc <= 0)
+		goto out_error3;
+
+	rc = file_read(key, kbuf, klen);
+	if (rc <= 0)
+		goto out_error3;
+
+	/* Set a key */
+	rc = blowfish_set_key(action, timeout, kbuf, klen);
+	if (rc != 0)
+		goto out_error3;
+
+	/* Encrypt/decrypt data */
+	rc = blowfish_cypher(action, decrypt ? MODE_DECRYPT : MODE_ENCRYPT,
+			     timeout, ibuf, ilen, obuf, ilen);
+	if (rc != 0)
+		goto out_error3;
+
+	rc = file_write(output, obuf, ilen);
+	if (rc <= 0)
+		goto out_error3;
+
+ go_home:
+	__free(ibuf);
+	__free(obuf);
+	__free(kbuf);
 
 	snap_detach_action(action);
 	snap_card_free(card);
 	exit(EXIT_SUCCESS);
 
+ out_error3:
+	__free(ibuf);
+	__free(obuf);
+	__free(kbuf);
  out_error2:
 	snap_detach_action(action);
  out_error1:
