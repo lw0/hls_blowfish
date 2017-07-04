@@ -118,10 +118,10 @@ static void print_bytes(const uint8_t *bytes, unsigned int length)
 
     while (i < length)
     {
-         fprintf(stdout, "%02X",(unsigned)bytes[i]);
+         fprintf(stderr, "%02X",(unsigned)bytes[i]);
          i++;
     }
-    fprintf(stdout, "\n");
+    fprintf(stderr, "\n");
 }
 
 /*---------------------------------------------------
@@ -189,7 +189,7 @@ static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
 			      data, SNAP_ADDRTYPE_HOST_DRAM,
 			      NULL, SNAP_ADDRTYPE_UNUSED);
 
-	fprintf(stdout, "INFO: Timer starts...\n");
+	fprintf(stderr, "INFO: Timer starts...\n");
 	gettimeofday(&stime, NULL);
 	rc = snap_action_sync_execute_job(action, &job, timeout);
 	gettimeofday(&etime, NULL);
@@ -234,7 +234,7 @@ static int blowfish_cypher(struct snap_action *action,
 			      (void *)ibuf, SNAP_ADDRTYPE_HOST_DRAM,
 			      (void *)obuf, SNAP_ADDRTYPE_HOST_DRAM);
 
-	fprintf(stdout, "INFO: Timer starts...\n");
+	fprintf(stderr, "INFO: Timer starts...\n");
 	gettimeofday(&stime, NULL);
 	rc = snap_action_sync_execute_job(action, &job, timeout);
 	gettimeofday(&etime, NULL);
@@ -244,16 +244,16 @@ static int blowfish_cypher(struct snap_action *action,
 		goto out_error;
 	}
 
-	fprintf(stdout, "RETC=%x\n", job.retc);
-	fprintf(stdout, "INFO: Blowfish took %lld usec\n",
+	fprintf(stderr, "RETC=%x\n", job.retc);
+	fprintf(stderr, "INFO: Blowfish took %lld usec\n",
 		(long long)timediff_usec(&etime, &stime));
-	fprintf(stdout, "------------------------------------------ \n");
+	fprintf(stderr, "------------------------------------------ \n");
 
 	/*
         case MODE_DECRYPT:
-            fprintf(stdout, "Cipher is at %p -> ", (void *)bjob_out.input_data.addr);
+            fprintf(stderr, "Cipher is at %p -> ", (void *)bjob_out.input_data.addr);
             print_bytes((unsigned char*) bjob_out.input_data.addr, 128);
-            fprintf(stdout, "Plaintext is at %p -> ", (void *)bjob_out.output_data.addr);
+            fprintf(stderr, "Plaintext is at %p -> ", (void *)bjob_out.output_data.addr);
             print_bytes((unsigned char*) bjob_out.output_data.addr, 128);
             break;
 	*/
@@ -365,7 +365,7 @@ int main(int argc, char *argv[])
 
 	//////////////////////////////////////////////////////////////////////
 
-	fprintf(stdout, "snap_kernel_attach start...\n");
+	fprintf(stderr, "snap_kernel_attach start...\n");
 	snprintf(device, sizeof(device)-1, "/dev/cxl/afu%d.0s", card_no);
 	card = snap_card_alloc_dev(device, SNAP_VENDOR_ID_IBM,
 				   SNAP_DEVICE_ID_SNAP);
