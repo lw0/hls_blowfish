@@ -81,6 +81,7 @@ int verbose_flag = 0;
 /*
  * FIXME If you like to use those pointers directly, use an gcc's alignment
  *       attributes and ensure that it is 64 byte aligned.
+ * FIXME Use a constant instead of the 64 ... 
  *
  * E.g. like this:
  *   __attribute__((align(64)));
@@ -96,6 +97,14 @@ static const uint8_t example_plaintext[] __attribute__((aligned(64))) = {
 	0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 64 bytes */
 };
 
+static uint8_t example_encrypted[64] __attribute__((aligned(64))) = {
+	0x00,
+};
+
+static uint8_t example_decrypted[64] __attribute__((aligned(64))) = {
+	0x00,
+};
+
 static unsigned char example_key[] __attribute__((aligned(64))) = {
 	0x00, 0x11, 0x22 , 0x33, 0x44, 0x55, 0x66, 0x77
 };
@@ -103,6 +112,10 @@ static unsigned char example_key[] __attribute__((aligned(64))) = {
 static void print_bytes(const uint8_t *bytes, unsigned int length)
 {
     unsigned int i =0;
+
+    if (bytes == NULL)
+	    return;
+
     while (i < length)
     {
          fprintf(stdout, "%02X",(unsigned)bytes[i]);
@@ -120,185 +133,139 @@ static void snap_prepare_blowfish(struct snap_job *job,
         uint32_t data_length_in,
         blowfish_job_t *bjob_in,
         blowfish_job_t *bjob_out,
-        void *addr_in,
+        const void *addr_in,
         uint16_t type_in,
         void *addr_out,
         uint16_t type_out)
 {
-    static const char *mode_str[] = 
-	    { "MODE_SET_KEY", "MODE_ENCRYPT", "MODE_DECRYPT" };
+	static const char *mode_str[] = 
+		{ "MODE_SET_KEY", "MODE_ENCRYPT", "MODE_DECRYPT" };
 
-    fprintf(stderr, "----------------  Config Space ----------- \n");
-    fprintf(stderr, "mode = %d %s\n", mode_in, mode_str[mode_in % 3]);
-    fprintf(stderr, "input_address = %p -> ",addr_in);
-    print_bytes((unsigned char*) addr_in, 128);
-    fprintf(stderr, "output_address = %p -> ", addr_out);
-    print_bytes((unsigned char*) addr_out, 128);
-    fprintf(stderr, "data_length = %d\n", data_length_in);
-    fprintf(stderr, "------------------------------------------ \n");
+	fprintf(stderr, "----------------  Config Space ----------- \n");
+	fprintf(stderr, "mode = %d %s\n", mode_in, mode_str[mode_in % 3]);
+	fprintf(stderr, "input_address = %p -> ", addr_in);
+	print_bytes((unsigned char*) addr_in, 128);
+	fprintf(stderr, "output_address = %p -> ", addr_out);
+	print_bytes((unsigned char*) addr_out, 128);
+	fprintf(stderr, "data_length = %d\n", data_length_in);
+	fprintf(stderr, "------------------------------------------ \n");
 
-    snap_addr_set(&bjob_in->input_data, addr_in, data_length_in,
-            type_in, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_SRC);
+	snap_addr_set(&bjob_in->input_data, addr_in, data_length_in,
+		      type_in, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_SRC);
 
-    snap_addr_set(&bjob_in->output_data, addr_out, data_length_in,
-            type_out, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST | SNAP_ADDRFLAG_END );
+	snap_addr_set(&bjob_in->output_data, addr_out, data_length_in,
+		      type_out, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
+		      SNAP_ADDRFLAG_END );
 
-    bjob_in->mode = mode_in;
-    bjob_in->data_length = data_length_in;
+	bjob_in->mode = mode_in;
+	bjob_in->data_length = data_length_in;
 
-    // Here sets the 108byte MMIO settings input.
-    // We have input parameters.
-    snap_job_set(job, bjob_in, sizeof(*bjob_in),
-            bjob_out, sizeof(*bjob_out));
+	// Here sets the 108byte MMIO settings input.
+	// We have input parameters.
+	snap_job_set(job, bjob_in, sizeof(*bjob_in),
+		     bjob_out, sizeof(*bjob_out));
 }
 
 /*---------------------------------------------------
  *       MAIN
  *---------------------------------------------------*/
 
-static void blowfish_operation(int card_no,
-			       unsigned long timeout,
-			       const uint8_t *data,
-			       unsigned int length,
-			       unsigned int mode)
+static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
+			    const uint8_t *data, unsigned int length)
 {
-    // input validation
-    if (mode == MODE_SET_KEY) {
-        if (length < 4 || length > 56 || length % 4 != 0) {
-            printf("err: key has to be multiple of 4 bytes with a length "
-		   "between 4 and 56 bytes!\n");
-            goto input_error;
+	int rc = 0;
+	struct timeval etime, stime;
+	struct snap_job job;
+	blowfish_job_t bjob_in;
+
+	// input validation
+	if (length < 4 || length > 56 || length % 4 != 0) {
+		printf("err: key has to be multiple of 4 bytes with a length "
+		       "between 4 and 56 bytes!\n");
+		return -EINVAL;
         }
-    }
-    if (mode == MODE_ENCRYPT || mode == MODE_DECRYPT) {
-        if (length % 8 != 0 || length <= 0) {
-            printf("err: data to en- or decrypt has to be multiple of "
-		   "8 bytes and at least 8 bytes long!\n");
-            goto input_error;
+	
+	snap_prepare_blowfish(&job, MODE_SET_KEY, length, &bjob_in, NULL,
+			      data, SNAP_ADDRTYPE_HOST_DRAM,
+			      NULL, SNAP_ADDRTYPE_UNUSED);
+
+	fprintf(stdout, "INFO: Timer starts...\n");
+	gettimeofday(&stime, NULL);
+	rc = snap_action_sync_execute_job(action, &job, timeout);
+	gettimeofday(&etime, NULL);
+	if (rc != 0) {
+		fprintf(stderr, "err: job execution %d: %s!\n", rc,
+			strerror(errno));
+		goto out_error;
+	}
+
+	fprintf(stderr, "RETC=%x\n", job.retc);
+	fprintf(stderr, "INFO: Blowfish took %lld usec\n",
+		(long long)timediff_usec(&etime, &stime));
+	fprintf(stderr, "------------------------------------------ \n");
+	fprintf(stderr, "Key set to:\n");
+	__hexdump(stderr, data, length);
+
+	return 0;
+
+ out_error:
+	return -EIO;
+}
+
+static int blowfish_cypher(struct snap_action *action,
+			   int mode, unsigned long timeout,
+			   const uint8_t *ibuf,
+			   unsigned int in_len,
+			   uint8_t *obuf,
+			   unsigned int out_len)
+{
+	int rc = 0;
+	struct timeval etime, stime;
+	struct snap_job job;
+	blowfish_job_t bjob_in;
+
+	if (in_len % 8 != 0 || in_len <= 0) {
+		printf("err: data to en- or decrypt has to be multiple of "
+		       "8 bytes and at least 8 bytes long!\n");
+		return -EINVAL;
         }
-    }
 
-    int rc = 0;
-    struct snap_card *card = NULL;
-    struct snap_action *action = NULL;
-    char device[128];
-    struct snap_job job;
-    struct timeval etime, stime;
-    uint32_t page_size = sysconf(_SC_PAGESIZE);
-    snap_action_flag_t action_irq = 0;
+	snap_prepare_blowfish(&job, mode, in_len, &bjob_in, NULL,
+			      (void *)ibuf, SNAP_ADDRTYPE_HOST_DRAM,
+			      (void *)obuf, SNAP_ADDRTYPE_HOST_DRAM);
 
-    //Action specfic
-    blowfish_job_t bjob_in;
-    blowfish_job_t bjob_out;
+	fprintf(stdout, "INFO: Timer starts...\n");
+	gettimeofday(&stime, NULL);
+	rc = snap_action_sync_execute_job(action, &job, timeout);
+	gettimeofday(&etime, NULL);
+	if (rc != 0) {
+		fprintf(stderr, "err: job execution %d: %s!\n", rc,
+			strerror(errno));
+		goto out_error;
+	}
 
-    //Input buffer
-    uint8_t type_in = SNAP_ADDRTYPE_HOST_DRAM;
-    unsigned char * ibuf = 0x0ull;
+	fprintf(stdout, "RETC=%x\n", job.retc);
+	fprintf(stdout, "INFO: Blowfish took %lld usec\n",
+		(long long)timediff_usec(&etime, &stime));
+	fprintf(stdout, "------------------------------------------ \n");
 
-    //Output buffer
-    uint8_t type_out = SNAP_ADDRTYPE_HOST_DRAM;
-    unsigned char * obuf = 0x0ull;
-
-    // allocate multiple of cacheline size (128 byte)
-    unsigned int in_size = (length/128 + 1) * 128;
-    unsigned int out_size = 0;
-
-    if (mode == MODE_ENCRYPT || mode == MODE_DECRYPT) {
-        out_size = in_size;
-    }
-
-    /* FIXME Always check memalign return code! */
-    ibuf = memalign(page_size, in_size);
-    memcpy(ibuf, data, length);
-
-    // TODO check if neccessary, or if data[] could directly be used
-    // data can only be used if it is aligned properly.
-
-    obuf = memalign(page_size, out_size);
-
-    //////////////////////////////////////////////////////////////////////
-
-    fprintf(stdout, "snap_kernel_attach start...\n");
-
-    snprintf(device, sizeof(device)-1, "/dev/cxl/afu%d.0s", card_no);
-    card = snap_card_alloc_dev(device, SNAP_VENDOR_ID_IBM,
-            SNAP_DEVICE_ID_SNAP);
-    if (card == NULL) {
-        fprintf(stderr, "err: failed to open card %u: %s\n",
-                card_no, strerror(errno));
-        goto out_error;
-    }
-
-    
-    action = snap_attach_action(card, BLOWFISH_ACTION_TYPE, action_irq, 60);
-    if (action == NULL) {
-        fprintf(stderr, "err: failed to attach action %u: %s\n",
-                card_no, strerror(errno));
-        goto out_error1;
-    }
-
-    snap_prepare_blowfish(&job, mode, length,
-            &bjob_in, &bjob_out,
-            (void *)ibuf, type_in,
-            (void *)obuf, type_out);
-
-    fprintf(stdout, "INFO: Timer starts...\n");
-    gettimeofday(&stime, NULL);
-    rc = snap_action_sync_execute_job(action, &job, timeout);
-    gettimeofday(&etime, NULL);
-    if (rc != 0) {
-        fprintf(stderr, "err: job execution %d: %s!\n", rc,
-                strerror(errno));
-        goto out_error2;
-    }
-
-    fprintf(stdout, "RETC=%x\n", job.retc);
-    fprintf(stdout, "INFO: Blowfish took %lld usec\n",
-            (long long)timediff_usec(&etime, &stime));
-    fprintf(stdout, "------------------------------------------ \n");
-
-    switch (mode) {
-        case MODE_SET_KEY: 
-            fprintf(stdout, "Key set to ");
-            print_bytes(data, length);
-            break;
-        case MODE_ENCRYPT:
-            fprintf(stdout, "Plaintext is at %p -> ", (void * )bjob_out.input_data.addr);
-            print_bytes((unsigned char*) bjob_out.input_data.addr, 128);
-            fprintf(stdout, "Cipher is at %p -> ", (void *)bjob_out.output_data.addr);
-            fprintf(stdout, "Cipher is at %p -> ", (void *)obuf);
-            print_bytes((unsigned char*) obuf, 128);
-            break;
+	/*
         case MODE_DECRYPT:
             fprintf(stdout, "Cipher is at %p -> ", (void *)bjob_out.input_data.addr);
             print_bytes((unsigned char*) bjob_out.input_data.addr, 128);
             fprintf(stdout, "Plaintext is at %p -> ", (void *)bjob_out.output_data.addr);
             print_bytes((unsigned char*) bjob_out.output_data.addr, 128);
             break;
-    }
+	*/
 
-    fprintf(stderr, "Input Buffer:\n");
-    __hexdump(stderr, ibuf, in_size);
+	fprintf(stderr, "Input Buffer:\n");
+	__hexdump(stderr, ibuf, in_len);
+	fprintf(stderr, "Output Buffer:\n");
+	__hexdump(stderr, obuf, out_len);
+	return 0;
 
-    fprintf(stderr, "Output Buffer:\n");
-    __hexdump(stderr, obuf, out_size);
-
-    snap_detach_action(action);
-    snap_card_free(card);
-    free(ibuf);
-    free(obuf);
-    
-    return;
-
-out_error2:
-    snap_detach_action(action);
-out_error1:
-    snap_card_free(card);
-out_error:
-    free(ibuf);
-    free(obuf);
-input_error:
-    exit(EXIT_FAILURE);
+ out_error:
+	return -EIO;
 }
 
 /**
@@ -323,11 +290,16 @@ static void usage(const char *prog)
 
 int main(int argc, char *argv[])
 {
+	int rc;
         int card_no = 0;
 	int decrypt = 0;
 	const char *input = NULL;
         const char *output = NULL;
         unsigned long timeout = 10000;
+	struct snap_card *card = NULL;
+	struct snap_action *action = NULL;
+	snap_action_flag_t action_irq = (SNAP_ACTION_DONE_IRQ | SNAP_ATTACH_IRQ);
+	char device[128];
 	int ch;
 
         while (1) {
@@ -390,10 +362,59 @@ int main(int argc, char *argv[])
 	if (verbose_flag)
 		print_bytes(example_plaintext, sizeof(example_plaintext));
 
-	blowfish_operation(card_no, timeout, example_key, sizeof(example_key),
-			   MODE_SET_KEY);
-	blowfish_operation(card_no, timeout, example_plaintext, sizeof(example_plaintext),
-			   MODE_ENCRYPT);
 
+	//////////////////////////////////////////////////////////////////////
+
+	fprintf(stdout, "snap_kernel_attach start...\n");
+	snprintf(device, sizeof(device)-1, "/dev/cxl/afu%d.0s", card_no);
+	card = snap_card_alloc_dev(device, SNAP_VENDOR_ID_IBM,
+				   SNAP_DEVICE_ID_SNAP);
+	if (card == NULL) {
+		fprintf(stderr, "err: failed to open card %u: %s\n",
+			card_no, strerror(errno));
+		goto out_error;
+	}
+    
+	action = snap_attach_action(card, BLOWFISH_ACTION_TYPE, action_irq, 60);
+	if (action == NULL) {
+		fprintf(stderr, "err: failed to attach action %u: %s\n",
+			card_no, strerror(errno));
+		goto out_error1;
+	}
+
+	/* Set a key */
+	rc = blowfish_set_key(action, timeout, example_key, sizeof(example_key));
+	if (rc != 0)
+		goto out_error2;
+
+	/* Encrypt data */
+	rc = blowfish_cypher(action, MODE_ENCRYPT, timeout,
+			     example_plaintext, sizeof(example_plaintext),
+			     example_encrypted, sizeof(example_encrypted));
+	if (rc != 0)
+		goto out_error2;
+
+	/* Decrypt data */
+	rc = blowfish_cypher(action, MODE_DECRYPT, timeout,
+			     example_encrypted, sizeof(example_encrypted),
+			     example_decrypted, sizeof(example_decrypted));
+	if (rc != 0)
+		goto out_error2;
+
+	if (memcmp(example_plaintext, example_decrypted,
+		   sizeof(example_plaintext)) != 0) {
+		fprintf(stderr, "ERROR: Data does not match!!\n");
+		goto out_error2;
+	}
+
+	snap_detach_action(action);
+	snap_card_free(card);
 	exit(EXIT_SUCCESS);
+
+ out_error2:
+	snap_detach_action(action);
+ out_error1:
+	snap_card_free(card);
+ out_error:
+	exit(EXIT_FAILURE);
 }
