@@ -77,31 +77,31 @@ static void bf_decrypt (uint32_t *L, uint32_t *R) {
 
 static void bf_endecrypt(int decrypt, uint64_t *input, uint64_t *output, size_t count)
 {
-	for (size_t i = 0; i < count; ++i)
-	{
-		// Calculate the addresses for left and right inputs
-		uint64_t *currentInputBlock = input + i;
-		uint32_t *leftInput = (uint32_t*)currentInputBlock;
-		uint32_t *rightInput = leftInput + 1;
-		
-		// Adjust byte order to big endian
-		uint32_t left = htonl(*leftInput);
-		uint32_t right = htonl(*rightInput);
+    for (size_t i = 0; i < count; ++i)
+    {
+        // Calculate the addresses for left and right inputs
+        uint64_t *currentInputBlock = input + i;
+        uint32_t *leftInput = (uint32_t*)currentInputBlock;
+        uint32_t *rightInput = leftInput + 1;
+        
+        // Adjust byte order to big endian
+        uint32_t left = htonl(*leftInput);
+        uint32_t right = htonl(*rightInput);
 
-		if (decrypt)
-			bf_decrypt(&left, &right);
-		else
-			bf_encrypt(&left, &right);
+        if (decrypt)
+            bf_decrypt(&left, &right);
+        else
+            bf_encrypt(&left, &right);
 
-		// Determine where to write the results
-		uint64_t *currentOutputBlock = output + i;
-		uint32_t *leftOutput = (uint32_t*)currentOutputBlock;
-		uint32_t *rightOutput = leftOutput + 1;
+        // Determine where to write the results
+        uint64_t *currentOutputBlock = output + i;
+        uint32_t *leftOutput = (uint32_t*)currentOutputBlock;
+        uint32_t *rightOutput = leftOutput + 1;
 
-		// Restore byte order if necessary
-		*leftOutput = ntohl(left);
-		*rightOutput = ntohl(right);
-	}
+        // Restore byte order if necessary
+        *leftOutput = ntohl(left);
+        *rightOutput = ntohl(right);
+    }
 }
 
 static void bf_keyInit(uint32_t (*key)[18])
@@ -114,7 +114,7 @@ static void bf_keyInit(uint32_t (*key)[18])
             g_S[n][i] = c_initS[n][i];
         }
     }
-	
+    
     uint32_t left = 0, right = 0;
     for (int i = 0; i < 18; i += 2) {
         bf_encrypt(&left, &right);
@@ -133,62 +133,62 @@ static void bf_keyInit(uint32_t (*key)[18])
 }
 
 static int action_main(struct snap_sim_action *action,
-		       void *job, unsigned int job_len)
+               void *job, unsigned int job_len)
 {
-	(void)job_len;
+    (void)job_len;
 
-	struct blowfish_job *js = (struct blowfish_job *)job;
+    struct blowfish_job *js = (struct blowfish_job *)job;
 
-	// if (sizeof(*js) != job_len)
-	// 	goto err_out;
+    // if (sizeof(*js) != job_len)
+    // 	goto err_out;
 
-	switch (js->mode) {
-	case MODE_SET_KEY: {
-		uint32_t keyLine[512>>2] = {0};
-		uint32_t key[18] = { 0 };
-		memcpy(keyLine, (void*)js->input_data.addr, js->data_length);
-		size_t keyWords = js->data_length >> 2;
-		for (size_t i = 0; i < 18; ++i) {
-			key[i] = htonl(keyLine[i % keyWords]);
-		}
-		bf_keyInit(&key);
-		break;
-	}
-	case MODE_ENCRYPT: {
-		bf_endecrypt(0, (uint64_t*)js->input_data.addr, (uint64_t*)js->output_data.addr, js->data_length / sizeof(uint64_t));
-		break;
-	}
-	case MODE_DECRYPT: {
-		bf_endecrypt(1, (uint64_t*)js->input_data.addr, (uint64_t*)js->output_data.addr, js->data_length / sizeof(uint64_t));
-		break;
-	}
-	}
+    switch (js->mode) {
+    case MODE_SET_KEY: {
+        uint32_t keyLine[512>>2] = {0};
+        uint32_t key[18] = { 0 };
+        memcpy(keyLine, (void*)js->input_data.addr, js->data_length);
+        size_t keyWords = js->data_length >> 2;
+        for (size_t i = 0; i < 18; ++i) {
+            key[i] = htonl(keyLine[i % keyWords]);
+        }
+        bf_keyInit(&key);
+        break;
+    }
+    case MODE_ENCRYPT: {
+        bf_endecrypt(0, (uint64_t*)js->input_data.addr, (uint64_t*)js->output_data.addr, js->data_length / sizeof(uint64_t));
+        break;
+    }
+    case MODE_DECRYPT: {
+        bf_endecrypt(1, (uint64_t*)js->input_data.addr, (uint64_t*)js->output_data.addr, js->data_length / sizeof(uint64_t));
+        break;
+    }
+    }
 
-	action->job.retc = SNAP_RETC_SUCCESS;
-	return 0;
+    action->job.retc = SNAP_RETC_SUCCESS;
+    return 0;
 //  err_out:
 // 	action->job.retc = SNAP_RETC_FAILURE;
 // 	return 0;
 }
 
 static struct snap_sim_action action = {
-	.vendor_id = SNAP_VENDOR_ID_ANY,
-	.device_id = SNAP_DEVICE_ID_ANY,
-	.action_type = BLOWFISH_ACTION_TYPE,
+    .vendor_id = SNAP_VENDOR_ID_ANY,
+    .device_id = SNAP_DEVICE_ID_ANY,
+    .action_type = BLOWFISH_ACTION_TYPE,
 
-	.job = { .retc = SNAP_RETC_FAILURE, },
-	.state = ACTION_IDLE,
-	.main = action_main,
-	.priv_data = NULL,
-	.mmio_write32 = NULL,
-	.mmio_read32 = NULL,
+    .job = { .retc = SNAP_RETC_FAILURE, },
+    .state = ACTION_IDLE,
+    .main = action_main,
+    .priv_data = NULL,
+    .mmio_write32 = NULL,
+    .mmio_read32 = NULL,
 
-	.next = NULL,
+    .next = NULL,
 };
 
 static void _init(void) __attribute__((constructor));
 
 static void _init(void)
 {
-	snap_action_register(&action);
+    snap_action_register(&action);
 }
