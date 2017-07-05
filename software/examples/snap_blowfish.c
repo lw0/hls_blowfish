@@ -354,7 +354,6 @@ static void usage(const char *prog)
                "  -i, --input <file.bin>    input\n"
                "  -o, --output <file.bin>   output\n"
                "  -k, --key <file.bin>      key\n"
-	       "  -c, --crypt\n"
 	       "  -d, --decrypt\n"
                "  -t, --timeout             timeout (sec)"
                "\n"
