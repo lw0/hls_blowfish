@@ -106,23 +106,8 @@ static uint8_t example_decrypted[64] __attribute__((aligned(64))) = {
 };
 
 static uint8_t example_key[] __attribute__((aligned(64))) = {
-	0x00, 0x11, 0x22 , 0x33, 0x44, 0x55, 0x66, 0x77
+	0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77
 };
-
-static void print_bytes(const uint8_t *bytes, unsigned int length)
-{
-    unsigned int i =0;
-
-    if (bytes == NULL)
-	    return;
-
-    while (i < length)
-    {
-         fprintf(stderr, "%02X",(unsigned)bytes[i]);
-         i++;
-    }
-    fprintf(stderr, "\n");
-}
 
 /*---------------------------------------------------
  *       Hook 108B Configuration
@@ -144,9 +129,7 @@ static void snap_prepare_blowfish(struct snap_job *job,
 	fprintf(stderr, "----------------  Config Space ----------- \n");
 	fprintf(stderr, "mode = %d %s\n", mode_in, mode_str[mode_in % 3]);
 	fprintf(stderr, "input_address = %p -> ", addr_in);
-	print_bytes((unsigned char*) addr_in, 128);
 	fprintf(stderr, "output_address = %p -> ", addr_out);
-	print_bytes((unsigned char*) addr_out, 128);
 	fprintf(stderr, "data_length = %d\n", data_length_in);
 	fprintf(stderr, "------------------------------------------ \n");
 
@@ -464,9 +447,6 @@ int main(int argc, char *argv[])
 		"  output: %s\n"
 		"  key: %s\n",
 		decrypt ? "decrypt" : "encrypt", input, output, key);
-
-	if (verbose_flag)
-		print_bytes(example_plaintext, sizeof(example_plaintext));
 
 	//////////////////////////////////////////////////////////////////////
 
