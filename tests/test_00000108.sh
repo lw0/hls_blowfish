@@ -32,7 +32,13 @@ function usage() {
     echo "    [-t <trace_level>] enable tracing"
     echo "    [-h]               display help"
     echo
+    echo "Example:"
+    echo "  SOFTWARE:"
+    echo "   time (SNAP_CONFIG=0x1 ./scripts/test_00000108.sh -C0 2>&1 | grep INFO)"
+    echo "  HARDWARE:"
+    echo "   time (SNAP_CONFIG=0x0 ./scripts/test_00000108.sh -C0 2>&1 | grep INFO)"
 }
+
 while getopts ":C:t:h" opt; do
     case $opt in
         C)
