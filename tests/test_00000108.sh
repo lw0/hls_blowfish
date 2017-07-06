@@ -54,7 +54,7 @@ done
 blowfish_test () {
     local blocks=$1
 
-    echo "Testing data with $blocks block(s) of each 64 bytes"
+    echo "INFO: Testing data with $blocks block(s) of each 64 bytes"
     dd if=/dev/urandom of=input.bin count=${blocks} bs=64 2> /dev/null
     dd if=/dev/urandom of=key.bin count=1 bs=16 2> /dev/null
     sync
@@ -86,7 +86,7 @@ blowfish_test () {
     fi
 }
 
-for blocks in 1 16 32 128 ; do
+for blocks in 1 16 32 128 1024 1000000 ; do
     blowfish_test $blocks
 done
 
