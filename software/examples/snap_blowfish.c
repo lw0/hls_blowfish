@@ -172,7 +172,6 @@ static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
                   key, SNAP_ADDRTYPE_HOST_DRAM,
                   NULL, SNAP_ADDRTYPE_UNUSED);
 
-    fprintf(stderr, "INFO: Timer starts...\n");
     gettimeofday(&stime, NULL);
     rc = snap_action_sync_execute_job(action, &job, timeout);
     gettimeofday(&etime, NULL);
@@ -183,12 +182,14 @@ static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
     }
 
     fprintf(stderr, "RETC=%x\n", job.retc);
-    fprintf(stderr, "INFO: Blowfish took %lld usec\n",
+    fprintf(stderr, "INFO: Blowfish took %lld usec\n\n",
         (long long)timediff_usec(&etime, &stime));
 
-    fprintf(stderr, "------------------------------------------ \n");
-    fprintf(stderr, "Key set to:\n");
-    __hexdump(stderr, key, length);
+    if (verbose_flag) {
+	fprintf(stderr, "------------------------------------------ \n");
+	fprintf(stderr, "Key set to:\n");
+	__hexdump(stderr, key, length);
+    }
 
     return 0;
 
@@ -218,7 +219,6 @@ static int blowfish_cypher(struct snap_action *action,
                   (void *)ibuf, SNAP_ADDRTYPE_HOST_DRAM,
                   (void *)obuf, SNAP_ADDRTYPE_HOST_DRAM);
 
-    fprintf(stderr, "INFO: Timer starts...\n");
     gettimeofday(&stime, NULL);
     rc = snap_action_sync_execute_job(action, &job, timeout);
     gettimeofday(&etime, NULL);
@@ -232,11 +232,14 @@ static int blowfish_cypher(struct snap_action *action,
     fprintf(stderr, "INFO: Blowfish took %lld usec\n",
         (long long)timediff_usec(&etime, &stime));
 
-    fprintf(stderr, "------------------------------------------ \n");
-    fprintf(stderr, "Input Buffer:\n");
-    __hexdump(stderr, ibuf, in_len);
-    fprintf(stderr, "Output Buffer:\n");
-    __hexdump(stderr, obuf, out_len);
+    if (verbose_flag) {
+	fprintf(stderr, "------------------------------------------ \n");
+	fprintf(stderr, "Input Buffer:\n");
+	__hexdump(stderr, ibuf, in_len);
+	fprintf(stderr, "Output Buffer:\n");
+	__hexdump(stderr, obuf, out_len);
+    }
+
     return 0;
 
  out_error:
@@ -441,12 +444,9 @@ int main(int argc, char *argv[])
 	}
     }
 
-    fprintf(stderr,	"Blowfish Cypher\n"
-        "  operation: %s\n"
-        "  input: %s\n"
-        "  output: %s\n"
-        "  key: %s\n",
-        decrypt ? "decrypt" : "encrypt", input, output, key);
+    fprintf(stderr, "Blowfish Cypher\n"
+	    "  operation: %s input: %s output: %s key: %s\n",
+	    decrypt ? "decrypt" : "encrypt", input, output, key);
 
     //////////////////////////////////////////////////////////////////////
 
