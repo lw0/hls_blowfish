@@ -41,9 +41,9 @@ typedef bf_halfBlock_t bf_P_t[18];
 
 //---------------------------------------------------------------------
 typedef struct {
-	CONTROL Control;	/*  16 bytes */
-	blowfish_job_t Data;	/* 108 bytes */
-	uint8_t padding[SNAP_HLS_JOBSIZE - sizeof(blowfish_job_t)];
+    CONTROL Control;	/*  16 bytes */
+    blowfish_job_t Data;	/* 108 bytes */
+    uint8_t padding[SNAP_HLS_JOBSIZE - sizeof(blowfish_job_t)];
 } action_reg;
 
 #endif  /* __ACTION_HLS_BLOWFISH_H__ */
