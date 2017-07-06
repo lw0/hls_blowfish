@@ -45,7 +45,7 @@ static uint32_t bf_f (uint32_t *x) {
    return ( h ^ g_S[2][*x >> 8 & 0xff] ) + g_S[3][*x & 0xff];
 }
 
-static void bf_encrypt (uint32_t *L, uint32_t *R) {   
+static void bf_encrypt (uint32_t *L, uint32_t *R) {
    for (int i=0 ; i<16 ; i += 2) {
       *L ^= g_P[i];
       *R ^= bf_f(L);
