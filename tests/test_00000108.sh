@@ -57,6 +57,7 @@ blowfish_test () {
     echo "Testing data with $blocks block(s) of each 64 bytes"
     dd if=/dev/urandom of=input.bin count=${blocks} bs=64 2> /dev/null
     dd if=/dev/urandom of=key.bin count=1 bs=16 2> /dev/null
+    sync
 
     # Encrypt
     snap_blowfish -k key.bin -i input.bin -o encrypted.bin
