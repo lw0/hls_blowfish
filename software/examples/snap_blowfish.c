@@ -1,5 +1,5 @@
 /*
- * Simple Breadth-first-search in C
+ * Example Blowfish Implementation for HLS tryout
  *
  * Use Adjacency list to describe a graph:
  *        https://en.wikipedia.org/wiki/Adjacency_list
@@ -106,23 +106,8 @@ static uint8_t example_decrypted[64] __attribute__((aligned(64))) = {
 };
 
 static uint8_t example_key[] __attribute__((aligned(64))) = {
-    0x00, 0x11, 0x22 , 0x33, 0x44, 0x55, 0x66, 0x77
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77
 };
-
-static void print_bytes(const uint8_t *bytes, unsigned int length)
-{
-    unsigned int i =0;
-
-    if (bytes == NULL)
-        return;
-
-    while (i < length)
-    {
-         fprintf(stderr, "%02X",(unsigned)bytes[i]);
-         i++;
-    }
-    fprintf(stderr, "\n");
-}
 
 /*---------------------------------------------------
  *       Hook 108B Configuration
@@ -139,23 +124,21 @@ static void snap_prepare_blowfish(struct snap_job *job,
         uint16_t type_out)
 {
     static const char *mode_str[] = 
-        { "MODE_SET_KEY", "MODE_ENCRYPT", "MODE_DECRYPT" };
+	    { "MODE_SET_KEY", "MODE_ENCRYPT", "MODE_DECRYPT" };
 
     fprintf(stderr, "----------------  Config Space ----------- \n");
     fprintf(stderr, "mode = %d %s\n", mode_in, mode_str[mode_in % 3]);
     fprintf(stderr, "input_address = %p -> ", addr_in);
-    print_bytes((unsigned char*) addr_in, 128);
     fprintf(stderr, "output_address = %p -> ", addr_out);
-    print_bytes((unsigned char*) addr_out, 128);
     fprintf(stderr, "data_length = %d\n", data_length_in);
     fprintf(stderr, "------------------------------------------ \n");
 
     snap_addr_set(&bjob_in->input_data, addr_in, data_length_in,
-              type_in, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_SRC);
+		  type_in, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_SRC);
 
     snap_addr_set(&bjob_in->output_data, addr_out, data_length_in,
-              type_out, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
-              SNAP_ADDRFLAG_END );
+		  type_out, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
+		  SNAP_ADDRFLAG_END );
 
     bjob_in->mode = mode_in;
     bjob_in->data_length = data_length_in;
@@ -163,7 +146,7 @@ static void snap_prepare_blowfish(struct snap_job *job,
     // Here sets the 108byte MMIO settings input.
     // We have input parameters.
     snap_job_set(job, bjob_in, sizeof(*bjob_in),
-             bjob_out, sizeof(*bjob_out));
+		 bjob_out, sizeof(*bjob_out));
 }
 
 /*---------------------------------------------------
@@ -189,7 +172,6 @@ static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
                   key, SNAP_ADDRTYPE_HOST_DRAM,
                   NULL, SNAP_ADDRTYPE_UNUSED);
 
-    fprintf(stderr, "INFO: Timer starts...\n");
     gettimeofday(&stime, NULL);
     rc = snap_action_sync_execute_job(action, &job, timeout);
     gettimeofday(&etime, NULL);
@@ -200,12 +182,14 @@ static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
     }
 
     fprintf(stderr, "RETC=%x\n", job.retc);
-    fprintf(stderr, "INFO: Blowfish took %lld usec\n",
+    fprintf(stderr, "INFO: Blowfish took %lld usec\n\n",
         (long long)timediff_usec(&etime, &stime));
 
-    fprintf(stderr, "------------------------------------------ \n");
-    fprintf(stderr, "Key set to:\n");
-    __hexdump(stderr, key, length);
+    if (verbose_flag) {
+	fprintf(stderr, "------------------------------------------ \n");
+	fprintf(stderr, "Key set to:\n");
+	__hexdump(stderr, key, length);
+    }
 
     return 0;
 
@@ -235,7 +219,6 @@ static int blowfish_cypher(struct snap_action *action,
                   (void *)ibuf, SNAP_ADDRTYPE_HOST_DRAM,
                   (void *)obuf, SNAP_ADDRTYPE_HOST_DRAM);
 
-    fprintf(stderr, "INFO: Timer starts...\n");
     gettimeofday(&stime, NULL);
     rc = snap_action_sync_execute_job(action, &job, timeout);
     gettimeofday(&etime, NULL);
@@ -249,11 +232,14 @@ static int blowfish_cypher(struct snap_action *action,
     fprintf(stderr, "INFO: Blowfish took %lld usec\n",
         (long long)timediff_usec(&etime, &stime));
 
-    fprintf(stderr, "------------------------------------------ \n");
-    fprintf(stderr, "Input Buffer:\n");
-    __hexdump(stderr, ibuf, in_len);
-    fprintf(stderr, "Output Buffer:\n");
-    __hexdump(stderr, obuf, out_len);
+    if (verbose_flag) {
+	fprintf(stderr, "------------------------------------------ \n");
+	fprintf(stderr, "Input Buffer:\n");
+	__hexdump(stderr, ibuf, in_len);
+	fprintf(stderr, "Output Buffer:\n");
+	__hexdump(stderr, obuf, out_len);
+    }
+
     return 0;
 
  out_error:
@@ -371,8 +357,8 @@ static void usage(const char *prog)
                "  -i, --input <file.bin>    input\n"
                "  -o, --output <file.bin>   output\n"
                "  -k, --key <file.bin>      key\n"
-           "  -c, --crypt\n"
-           "  -d, --decrypt\n"
+	       "  -d, --decrypt\n"
+	       "  -d, --decrypt\n"
                "  -t, --timeout             timeout (sec)"
                "\n"
                "Example:\n"
@@ -384,89 +370,83 @@ static void usage(const char *prog)
 int main(int argc, char *argv[])
 {
     int rc;
-        int card_no = 0;
+    int card_no = 0;
     const char *input = NULL;
-        const char *output = NULL;
+    const char *output = NULL;
     const char *key = NULL;
     uint8_t *ibuf = NULL, *obuf = NULL, *kbuf = NULL;
     size_t ilen, klen;
     int decrypt = 0;
     int test = 0;
-        unsigned long timeout = 10000;
+    unsigned long timeout = 10000;
     struct snap_card *card = NULL;
     struct snap_action *action = NULL;
     snap_action_flag_t action_irq = (SNAP_ACTION_DONE_IRQ | SNAP_ATTACH_IRQ);
     char device[128];
     int ch;
 
-        while (1) {
-                int option_index = 0;
-                static struct option long_options[] = {
-                        { "card",        required_argument, NULL, 'C' },
-                        { "input",       required_argument, NULL, 'i' },
-                        { "output",      required_argument, NULL, 'o' },
-                        { "key",         required_argument, NULL, 'k' },
-            { "test",        no_argument,       NULL, 'T' },
-                        { "decrypt",     no_argument,       NULL, 'd' },
-                        { "timeout",     required_argument, NULL, 't' },
-                        { "version",     no_argument,       NULL, 'V' },
-                        { "verbose",     no_argument,       NULL, 'v' },
-                        { "help",        no_argument,       NULL, 'h' },
-                        { 0,             no_argument,       NULL, 0   },
-                };
+    while (1) {
+	int option_index = 0;
+	static struct option long_options[] = {
+		{ "card",        required_argument, NULL, 'C' },
+		{ "input",       required_argument, NULL, 'i' },
+		{ "output",      required_argument, NULL, 'o' },
+		{ "key",         required_argument, NULL, 'k' },
+		{ "test",        no_argument,       NULL, 'T' },
+		{ "decrypt",     no_argument,       NULL, 'd' },
+		{ "timeout",     required_argument, NULL, 't' },
+		{ "version",     no_argument,       NULL, 'V' },
+		{ "verbose",     no_argument,       NULL, 'v' },
+		{ "help",        no_argument,       NULL, 'h' },
+		{ 0,             no_argument,       NULL, 0   },
+	};
 
-                ch = getopt_long(argc, argv, "C:i:o:k:Tdt:Vvh",
-                                 long_options, &option_index);
-                if (ch == -1)
-                        break;
-
-                switch (ch) {
-                case 'C':
-                        card_no = strtol(optarg, (char **)NULL, 0);
-                        break;
-                case 'i':
-                        input = optarg;
-                        break;
-                case 'o':
-                        output = optarg;
-                        break;
-                case 'k':
-                        key = optarg;
-                        break;
-        case 'T':
-            test = 1;
-            break;
-        case 'd':
-            decrypt = 1;
-            break;
-                case 't':
-                        timeout = strtol(optarg, (char **)NULL, 0);
-                        break;
-                case 'V':
-                        printf("%s\n", version);
-                        exit(EXIT_SUCCESS);
-                case 'v':
-                        verbose_flag++;
-                        break;
-                case 'h':
-                        usage(argv[0]);
-                        exit(EXIT_SUCCESS);
-                        break;
-                default:
-                        usage(argv[0]);
-                        exit(EXIT_FAILURE);
-                }
+	ch = getopt_long(argc, argv, "C:i:o:k:Tdt:Vvh",
+			 long_options, &option_index);
+	if (ch == -1)
+		break;
+    
+	switch (ch) {
+	case 'C':
+		card_no = strtol(optarg, (char **)NULL, 0);
+		break;
+	case 'i':
+		input = optarg;
+		break;
+	case 'o':
+		output = optarg;
+		break;
+	case 'k':
+		key = optarg;
+		break;
+	case 'T':
+		test = 1;
+		break;
+	case 'd':
+		decrypt = 1;
+		break;
+	case 't':
+		timeout = strtol(optarg, (char **)NULL, 0);
+		break;
+	case 'V':
+		printf("%s\n", version);
+		exit(EXIT_SUCCESS);
+	case 'v':
+		verbose_flag++;
+		break;
+	case 'h':
+		usage(argv[0]);
+		exit(EXIT_SUCCESS);
+		break;
+	default:
+		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
     }
 
-    fprintf(stderr,	"Blowfish Cypher\n"
-        "  operation: %s\n"
-        "  input: %s\n"
-        "  output: %s\n"
-        "  key: %s\n",
-        decrypt ? "decrypt" : "encrypt", input, output, key);
-
-    if (verbose_flag)
-        print_bytes(example_plaintext, sizeof(example_plaintext));
+    fprintf(stderr, "Blowfish Cypher\n"
+	    "  operation: %s input: %s output: %s key: %s\n",
+	    decrypt ? "decrypt" : "encrypt", input, output, key);
 
     //////////////////////////////////////////////////////////////////////
 
