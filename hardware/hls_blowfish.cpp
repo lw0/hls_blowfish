@@ -12,6 +12,8 @@
 #include <string.h>
 #include <iostream>
 #include <hls_stream.h>
+
+#include <hls_minibuf.H>
 #include "ap_int.h"
 #include "action_blowfish.H"
 #include "hls_blowfish_data.hpp"
@@ -132,7 +134,7 @@ static void bf_encrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
 
 BF_ENCRYPT:
     for (int i = 0; i < 16; i += 2) {
-#pragma HLS_UNROLL factor=16
+#pragma HLS UNROLL factor=16
         left ^= g_P[i];
         right ^= bf_f(left);
         right ^= g_P[i+1];
@@ -154,7 +156,7 @@ static void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
 
 BF_DECRYPT:
     for (int i = 16; i > 0; i -= 2) {
-#pragma HLS_UNROLL factor=16
+#pragma HLS UNROLL factor=16
         left ^= g_P[i+1];
         right ^= bf_f(left);
         right ^= g_P[i];
@@ -233,6 +235,14 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
     snapu64_t inLineAddr = inAddr >> ADDR_RIGHT_SHIFT;
     snapu64_t outLineAddr = outAddr >> ADDR_RIGHT_SHIFT;
     snapu32_t dataBlocks = dataBytes >> BF_BLOCK_BADR_BITS;
+    snap_4KiB_t rbuf;
+    snap_4KiB_t wbuf;
+
+    snap_4KiB_rinit(&rbuf, hostMem_in + inLineAddr,
+		    dataBytes/sizeof(snap_membus_t));
+
+    snap_4KiB_winit(&wbuf, hostMem_out + outLineAddr,
+		    dataBytes/sizeof(snap_membus_t));
 
     /* FIXME check if the condition is correct */
     if ((dataBytes & BF_BLOCK_BADR_MASK) != 0) // check blockwidth alignment
@@ -245,12 +255,17 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
     snapu32_t lineCount = dataBlocks / BF_BLOCKSPERLINE;
     fprintf(stderr, "Processing lineCount=%d ...\n", (int)lineCount);
 
-    for (snapu32_t lineOffset = 0; lineOffset < lineCount; ++lineOffset)
-    {
+ LINE_PROCESSING:
+    for (snapu32_t lineOffset = 0; lineOffset < lineCount;
+	 ++lineOffset) {
+#pragma HLS PIPELINE
     fprintf(stderr, "Processing lineOffset=%d ...\n", (int)lineOffset);
 
         // fetch next line
-        snap_membus_t line = hostMem_in[inLineAddr + lineOffset];
+    snap_membus_t line; /* = hostMem_in[inLineAddr + lineOffset]; */
+
+	snap_4KiB_get(&rbuf, &line);
+
 
         // determine number of valid blocks in line
         snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
@@ -261,8 +276,10 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
         }
 
         // blockwise processing
-        for (snapu8_t blockOffset = 0; blockOffset < blockCount; ++blockOffset)
-        {
+    BLOCKWISE_PROCESSING:
+        for (snapu8_t blockOffset = 0; blockOffset < blockCount;
+	     ++blockOffset) {
+#pragma HLS UNROLL factor=16
             snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS;
             //bf_halfBlock_t right =  line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS);
             //bf_halfBlock_t left = line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0);
@@ -287,9 +304,12 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
 
         // write processed line
         print_line("write", line);
-        hostMem_out[outLineAddr + lineOffset] = line;
+
+        /* hostMem_out[outLineAddr + lineOffset] = line; */
+	snap_4KiB_put(&wbuf, line);
     }
 
+    snap_4KiB_flush(&wbuf);
     return SNAP_RETC_SUCCESS;
 }
 
