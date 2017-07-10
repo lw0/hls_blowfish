@@ -33,6 +33,8 @@ static void print_line(const char *msg, snap_membus_t line)
 #endif
 }
 
+/* FIXME Cutting out bits at variable offsets might be bad,
+   well just used for keystore might be fine */
 static bf_halfBlock_t bf_lineToHBlock(const snap_membus_t & line, unsigned firstByte)
 {
     bf_halfBlock_t h = 0;
@@ -51,6 +53,7 @@ static bf_halfBlock_t bf_lineToHBlock(const snap_membus_t & line, unsigned first
     return h;
 }
 
+/* FIXME Cutting out bits at variable offsets might be bad */
 static void bf_hBlockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBlock_t h)
 {
     // big endian
@@ -176,23 +179,29 @@ static void bf_keyInit(bf_halfBlock_t key[18])
 {
     printf("bf_keyInit() <- \n");
     for (int i = 0; i < 18; ++i) {
+#pragma HLS UNROLL
         g_P[i] = c_initP[i] ^ key[i];
     }
     for (int n = 0; n < 4; ++n) {
+#pragma HLS UNROLL
         for (int i = 0; i < 256; ++i) {
+#pragma HLS UNROLL factor=16
             g_S[n][i] = c_initS[n][i];
         }
     }
     bf_halfBlock_t left = 0, right = 0;
     for (int i = 0; i < 18; i += 2) {
+#pragma HLS UNROLL
         bf_encrypt(left, right);
         g_P[i] = left;
         g_P[i+1] = right;
     }
     for (int n = 0; n < 4; ++n)
     {
+#pragma HLS UNROLL
         for (int i = 0; i < 256; i += 2)
         {
+#pragma HLS UNROLL factor=16
             bf_encrypt(left, right);
             g_S[n][i] = left;
             g_S[n][i+1] = right;
