@@ -19,6 +19,7 @@
 #include "hls_blowfish_data.hpp"
 
 #define HW_RELEASE_LEVEL       0x00000013
+#define CONFIG_USE_4KIB
 
 using namespace std;
 
@@ -179,29 +180,21 @@ static void bf_keyInit(bf_halfBlock_t key[18])
 {
     printf("bf_keyInit() <- \n");
     for (int i = 0; i < 18; ++i) {
-#pragma HLS UNROLL
         g_P[i] = c_initP[i] ^ key[i];
     }
     for (int n = 0; n < 4; ++n) {
-#pragma HLS UNROLL
         for (int i = 0; i < 256; ++i) {
-#pragma HLS UNROLL factor=16
             g_S[n][i] = c_initS[n][i];
         }
     }
     bf_halfBlock_t left = 0, right = 0;
     for (int i = 0; i < 18; i += 2) {
-#pragma HLS UNROLL
         bf_encrypt(left, right);
         g_P[i] = left;
         g_P[i+1] = right;
     }
-    for (int n = 0; n < 4; ++n)
-    {
-#pragma HLS UNROLL
-        for (int i = 0; i < 256; i += 2)
-        {
-#pragma HLS UNROLL factor=16
+    for (int n = 0; n < 4; ++n) {
+        for (int i = 0; i < 256; i += 2) {
             bf_encrypt(left, right);
             g_S[n][i] = left;
             g_S[n][i+1] = right;
@@ -225,8 +218,7 @@ static snapu32_t action_setkey(snap_membus_t * hostMem_in,
     snap_membus_t keyLine = hostMem_in[keyLineAddr];
     
     bf_halfBlock_t key[18];
-    for (int i = 0; i < 18; ++i)
-    {
+    for (int i = 0; i < 18; ++i) {
         key[i] = bf_lineToHBlock(keyLine, (i % keyWords.to_int()) * 4);
         printf("%d : 0x%08x\n", i, *((uint32_t *)(void *)&key[i]));
     }
@@ -267,58 +259,63 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
  LINE_PROCESSING:
     for (snapu32_t lineOffset = 0; lineOffset < lineCount;
 	 ++lineOffset) {
-#pragma HLS PIPELINE
-    fprintf(stderr, "Processing lineOffset=%d ...\n", (int)lineOffset);
+        fprintf(stderr, "Processing lineOffset=%d ...\n", (int)lineOffset);
 
-        // fetch next line
-    snap_membus_t line; /* = hostMem_in[inLineAddr + lineOffset]; */
+	// fetch next line
+	snap_membus_t line;
 
+#ifndef CONFIG_USE_4KIB
+	line = hostMem_in[inLineAddr + lineOffset];
+#else
 	snap_4KiB_get(&rbuf, &line);
+#endif
 
+	// determine number of valid blocks in line
+	snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
+	snapu8_t blockCount = dataBlocks - blocksDone;
+	if (blockCount > BF_BLOCKSPERLINE) {
+	    blockCount = BF_BLOCKSPERLINE;
+	}
 
-        // determine number of valid blocks in line
-        snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
-        snapu8_t blockCount = dataBlocks - blocksDone;
-        if (blockCount > BF_BLOCKSPERLINE)
-        {
-            blockCount = BF_BLOCKSPERLINE;
-        }
-
-        // blockwise processing
+	// blockwise processing
     BLOCKWISE_PROCESSING:
-        for (snapu8_t blockOffset = 0; blockOffset < blockCount;
+	for (snapu8_t blockOffset = 0; blockOffset < blockCount;
 	     ++blockOffset) {
-#pragma HLS UNROLL factor=16
-            snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS;
-            //bf_halfBlock_t right =  line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS);
-            //bf_halfBlock_t left = line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0);
-            bf_halfBlock_t left, right;
-            bf_lineToBlock(line, blockOffset * 8, left, right);
+	    snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS;
+	    //bf_halfBlock_t right =  line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS);
+	    //bf_halfBlock_t left = line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0);
+	    bf_halfBlock_t left, right;
+	    bf_lineToBlock(line, blockOffset * 8, left, right);
 
-            //left = bf_bswap(left);
-            //right = bf_bswap(right);
+	    //left = bf_bswap(left);
+	    //right = bf_bswap(right);
 
-            if (decrypt)
-                bf_decrypt(left, right);
-            else
-                bf_encrypt(left, right);
+	    if (decrypt)
+		bf_decrypt(left, right);
+	    else
+		bf_encrypt(left, right);
 
-            //left = bf_bswap(left);
-            //right = bf_bswap(right);
+	    //left = bf_bswap(left);
+	    //right = bf_bswap(right);
 
-            bf_blockToLine(line, blockOffset * 8, left, right);
-            //line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS) = right;
-            //line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0) = left;
-        }
+	    bf_blockToLine(line, blockOffset * 8, left, right);
+	    //line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS) = right;
+	    //line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0) = left;
+	}
 
         // write processed line
         print_line("write", line);
 
-        /* hostMem_out[outLineAddr + lineOffset] = line; */
+#ifndef CONFIG_USE_4KIB
+        hostMem_out[outLineAddr + lineOffset] = line;
+#else
 	snap_4KiB_put(&wbuf, line);
+#endif
     }
 
+#ifdef CONFIG_USE_4KIB
     snap_4KiB_flush(&wbuf);
+#endif
     return SNAP_RETC_SUCCESS;
 }
 
