@@ -24,10 +24,10 @@ extern "C" {
 // This must match with DATA structure in hls_blowfish/kernel.cpp
 // Job description should start with the list of addresses.
 typedef struct blowfish_job {
-	struct snap_addr input_data;
-	struct snap_addr output_data; // not needed for MODE_SET_KEY
-	uint32_t mode;
-	uint32_t data_length;
+    struct snap_addr input_data;
+    struct snap_addr output_data; // not needed for MODE_SET_KEY
+    uint32_t mode;
+    uint32_t data_length;
 } blowfish_job_t;
 
 /* For later: */
