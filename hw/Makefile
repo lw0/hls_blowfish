@@ -30,4 +30,4 @@ SOLUTION_NAME ?= blowfish
 SOLUTION_DIR ?= hlsBlowfish
 srcs += hls_blowfish.cpp
 
-include ../hls.mk
+include ../../hls.mk

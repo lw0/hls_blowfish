@@ -19,3 +19,4 @@ snap_blowfish_objs = action_blowfish.o
 
 projs += snap_blowfish
 
+include ../../software.mk
