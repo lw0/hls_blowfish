@@ -19,7 +19,6 @@
 #include "hls_blowfish_data.hpp"
 
 #define HW_RELEASE_LEVEL       0x00000013
-#define CONFIG_USE_4KIB
 
 using namespace std;
 
@@ -233,80 +232,74 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
                             snap_membus_t * hostMem_out, snapu64_t outAddr,
                             snapu32_t dataBytes, snap_bool_t decrypt)
 {
-    snapu64_t inLineAddr = inAddr >> ADDR_RIGHT_SHIFT;
+/*    snapu64_t inLineAddr = inAddr >> ADDR_RIGHT_SHIFT;
     snapu64_t outLineAddr = outAddr >> ADDR_RIGHT_SHIFT;
     snapu32_t dataBlocks = dataBytes >> BF_BLOCK_BADR_BITS;
-    snap_4KiB_t rbuf;
-    snap_4KiB_t wbuf;
-
-    snap_4KiB_rinit(&rbuf, hostMem_in + inLineAddr,
-            dataBytes/sizeof(snap_membus_t));
-
-    snap_4KiB_winit(&wbuf, hostMem_out + outLineAddr,
-            dataBytes/sizeof(snap_membus_t));
-
-    /* FIXME check if the condition is correct */
+    
+    // FIXME check if the condition is correct
     if ((dataBytes & BF_BLOCK_BADR_MASK) != 0) // check blockwidth alignment
     {
-    fprintf(stderr, "ERR: dataBytes=%d dataBlocks=%d BF_BLOCKSPERLINE=%d non correctly aligned!\n",
-        (int)dataBytes, (int)dataBlocks, BF_BLOCKSPERLINE);
+        fprintf(stderr, "ERR: dataBytes=%d dataBlocks=%d BF_BLOCKSPERLINE=%d non correctly aligned!\n",
+                            (int)dataBytes, (int)dataBlocks, BF_BLOCKSPERLINE);
         return SNAP_RETC_FAILURE;
     }
+    
+    snap_4KiB_t rbuf;
+    snap_4KiB_t wbuf;
+    snap_4KiB_rinit(&rbuf, hostMem_in + inLineAddr, dataBytes/sizeof(snap_membus_t));
+    snap_4KiB_winit(&wbuf, hostMem_out + outLineAddr, dataBytes/sizeof(snap_membus_t));
+
 
     snapu32_t lineCount = dataBlocks / BF_BLOCKSPERLINE;
     fprintf(stderr, "Processing lineCount=%d ...\n", (int)lineCount);
 
- LINE_PROCESSING:
-    for (snapu32_t lineOffset = 0; lineOffset < lineCount;
-     ++lineOffset) {
+    LINE_PROCESSING:
+    for (snapu32_t lineOffset = 0; lineOffset < lineCount; ++lineOffset)
+    {
         fprintf(stderr, "Processing lineOffset=%d ...\n", (int)lineOffset);
 
-    // fetch next line
-    snap_membus_t line;
+        // fetch next line
+        snap_membus_t line;
 
-#ifndef CONFIG_USE_4KIB
-    line = hostMem_in[inLineAddr + lineOffset];
-#else
-    snap_4KiB_get(&rbuf, &line);
-#endif
+        snap_4KiB_get(&rbuf, &line);
 
-    /* // determine number of valid blocks in line */
-    /* snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE); */
-    /* snapu8_t blockCount = dataBlocks - blocksDone; */
-    /* if (blockCount > BF_BLOCKSPERLINE) { */
-    /*     blockCount = BF_BLOCKSPERLINE; */
-    /* } */
+        // determine number of valid blocks in line
+        snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
+        snapu8_t blockCount = dataBlocks - blocksDone;
+        if (blockCount > BF_BLOCKSPERLINE)
+        {
+            blockCount = BF_BLOCKSPERLINE;
+        }
 
-    /* // blockwise processing */
-    /* BLOCKWISE_PROCESSING: */
-    /* for (snapu8_t blockOffset = 0; blockOffset < blockCount; */
-    /*      ++blockOffset) { */
-    /*     snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS; */
-    /*     bf_halfBlock_t left, right; */
-    /*     bf_lineToBlock(line, blockOffset * 8, left, right); */
+        // blockwise processing
+        BLOCKWISE_PROCESSING:
+        for (snapu8_t blockOffset = 0; blockOffset < blockCount; ++blockOffset)
+        {
+            snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS;
+            bf_halfBlock_t left, right;
+            bf_lineToBlock(line, blockOffset * 8, left, right);
 
-    /*     /1* if (decrypt) *1/ */
-    /*  /1* bf_decrypt(left, right); *1/ */
-    /*     /1* else *1/ */
-    /*  /1* bf_encrypt(left, right); *1/ */
+            if (decrypt)
+                bf_decrypt(left, right);
+            else
+                bf_encrypt(left, right);
 
-    /*     bf_blockToLine(line, blockOffset * 8, left, right); */
-    /* } */
+            bf_blockToLine(line, blockOffset * 8, left, right);
+        }
 
         // write processed line
         print_line("write", line);
 
-#ifndef CONFIG_USE_4KIB
-        hostMem_out[outLineAddr + lineOffset] = line;
-#else
-    snap_4KiB_put(&wbuf, line);
-#endif
+        snap_4KiB_put(&wbuf, line);
     }
 
-#ifdef CONFIG_USE_4KIB
     snap_4KiB_flush(&wbuf);
-#endif
-    return SNAP_RETC_SUCCESS;
+    return SNAP_RETC_SUCCESS;*/
+    bf_halfBlock_t left = 0, right = 0;
+    for (snapu32_t i = 0; i < dataBlocks; ++i)
+    {
+        bf_encrypt(left, right);
+    }
 }
 
 static snapu32_t process_action(snap_membus_t * din_gmem,
@@ -343,15 +336,6 @@ static snapu32_t process_action(snap_membus_t * din_gmem,
     default:
         break;
     }
-
-    /* snap_membus_t buffer[16]; */
-    /* memcpy(buffer, (snap_membus_t *)(din_gmem + (inAddr >> ADDR_RIGHT_SHIFT)), 64); */
-    /* memcpy((snap_membus_t *)(dout_gmem + (outAddr >> ADDR_RIGHT_SHIFT)), buffer, 64); */
-
-    /* (din_gmem + (inAddr >>ADDR_RIGHT_SHIFT))[0] =       0x1111111111111111111111111111111111111111111111111111111111111111; */
-    /* (din_gmem + (outAddr >>ADDR_RIGHT_SHIFT))[0] =      0x2222222222222222222222222222222222222222222222222222222222222222; */
-    /* (dout_gmem + (inAddr >>ADDR_RIGHT_SHIFT))[0] =      0x5555555555555555555555555555555555555555555555555555555555555555; */
-    /* (dout_gmem + (outAddr >>ADDR_RIGHT_SHIFT))[0] =     0x6666666666666666666666666666666666666666666666666666666666666666; */
 
     return retc;
 }
