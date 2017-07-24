@@ -46,10 +46,10 @@ static bf_halfBlock_t bf_lineToHBlock(const snap_membus_t & line, unsigned first
     h |= line.range(firstByte*8 + 31, firstByte*8 + 24) <<  0;
 
     // little endian
-//	h |= line.range(firstByte*8 +  7, firstByte*8 +  0) <<  0;
-//	h |= line.range(firstByte*8 + 15, firstByte*8 +  8) <<  8;
-//	h |= line.range(firstByte*8 + 23, firstByte*8 + 16) << 16;
-//	h |= line.range(firstByte*8 + 31, firstByte*8 + 24) << 24;
+//  h |= line.range(firstByte*8 +  7, firstByte*8 +  0) <<  0;
+//  h |= line.range(firstByte*8 + 15, firstByte*8 +  8) <<  8;
+//  h |= line.range(firstByte*8 + 23, firstByte*8 + 16) << 16;
+//  h |= line.range(firstByte*8 + 31, firstByte*8 + 24) << 24;
 
     return h;
 }
@@ -58,10 +58,10 @@ static bf_halfBlock_t bf_lineToHBlock(const snap_membus_t & line, unsigned first
 static void bf_hBlockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBlock_t h)
 {
     // big endian
-//	line.range(firstByte*8 +  7, firstByte*8 +  0) = (h >> 24) & 0xff;
-//	line.range(firstByte*8 + 15, firstByte*8 +  8) = (h >> 16) & 0xff;
-//	line.range(firstByte*8 + 23, firstByte*8 + 16) = (h >>  8) & 0xff;
-//	line.range(firstByte*8 + 31, firstByte*8 + 24) = (h >>  0) & 0xff;
+//  line.range(firstByte*8 +  7, firstByte*8 +  0) = (h >> 24) & 0xff;
+//  line.range(firstByte*8 + 15, firstByte*8 +  8) = (h >> 16) & 0xff;
+//  line.range(firstByte*8 + 23, firstByte*8 + 16) = (h >>  8) & 0xff;
+//  line.range(firstByte*8 + 31, firstByte*8 + 24) = (h >>  0) & 0xff;
 
     // little endian
     line.range(firstByte*8 +  7, firstByte*8 +  0) = (h >>  0) & 0xff;
@@ -87,15 +87,15 @@ static void bf_lineToBlock(const snap_membus_t & line, unsigned firstByte, bf_ha
     r |= line.range(firstByte*8 + 63, firstByte*8 + 56) <<  0;
 
     // little endian
-//	l |= line.range(firstByte*8 +  7, firstByte*8 +  0) <<  0;
-//	l |= line.range(firstByte*8 + 15, firstByte*8 +  8) <<  8;
-//	l |= line.range(firstByte*8 + 23, firstByte*8 + 16) << 16;
-//	l |= line.range(firstByte*8 + 31, firstByte*8 + 24) << 24;
+//  l |= line.range(firstByte*8 +  7, firstByte*8 +  0) <<  0;
+//  l |= line.range(firstByte*8 + 15, firstByte*8 +  8) <<  8;
+//  l |= line.range(firstByte*8 + 23, firstByte*8 + 16) << 16;
+//  l |= line.range(firstByte*8 + 31, firstByte*8 + 24) << 24;
 //
-//	r |= line.range(firstByte*8 + 39, firstByte*8 + 32) <<  0;
-//	r |= line.range(firstByte*8 + 47, firstByte*8 + 40) <<  8;
-//	r |= line.range(firstByte*8 + 55, firstByte*8 + 48) << 16;
-//	r |= line.range(firstByte*8 + 63, firstByte*8 + 56) << 24;
+//  r |= line.range(firstByte*8 + 39, firstByte*8 + 32) <<  0;
+//  r |= line.range(firstByte*8 + 47, firstByte*8 + 40) <<  8;
+//  r |= line.range(firstByte*8 + 55, firstByte*8 + 48) << 16;
+//  r |= line.range(firstByte*8 + 63, firstByte*8 + 56) << 24;
 }
 
 static void bf_blockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBlock_t l, bf_halfBlock_t r)
@@ -112,15 +112,15 @@ static void bf_blockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBloc
     line.range(firstByte*8 + 63, firstByte*8 + 56) = (r >>  0) & 0xff;
 
     // little endian
-//	line.range(firstByte*8 +  7, firstByte*8 +  0) = (l >>  0) & 0xff;
-//	line.range(firstByte*8 + 15, firstByte*8 +  8) = (l >>  8) & 0xff;
-//	line.range(firstByte*8 + 23, firstByte*8 + 16) = (l >> 16) & 0xff;
-//	line.range(firstByte*8 + 31, firstByte*8 + 24) = (l >> 24) & 0xff;
+//  line.range(firstByte*8 +  7, firstByte*8 +  0) = (l >>  0) & 0xff;
+//  line.range(firstByte*8 + 15, firstByte*8 +  8) = (l >>  8) & 0xff;
+//  line.range(firstByte*8 + 23, firstByte*8 + 16) = (l >> 16) & 0xff;
+//  line.range(firstByte*8 + 31, firstByte*8 + 24) = (l >> 24) & 0xff;
 //
-//	line.range(firstByte*8 + 39, firstByte*8 + 32) = (r >>  0) & 0xff;
-//	line.range(firstByte*8 + 47, firstByte*8 + 40) = (r >>  8) & 0xff;
-//	line.range(firstByte*8 + 55, firstByte*8 + 48) = (r >> 16) & 0xff;
-//	line.range(firstByte*8 + 63, firstByte*8 + 56) = (r >> 24) & 0xff;
+//  line.range(firstByte*8 + 39, firstByte*8 + 32) = (r >>  0) & 0xff;
+//  line.range(firstByte*8 + 47, firstByte*8 + 40) = (r >>  8) & 0xff;
+//  line.range(firstByte*8 + 55, firstByte*8 + 48) = (r >> 16) & 0xff;
+//  line.range(firstByte*8 + 63, firstByte*8 + 56) = (r >> 24) & 0xff;
 }
 
 static bf_halfBlock_t bf_f(bf_halfBlock_t h)
@@ -240,10 +240,10 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
     snap_4KiB_t wbuf;
 
     snap_4KiB_rinit(&rbuf, hostMem_in + inLineAddr,
-		    dataBytes/sizeof(snap_membus_t));
+            dataBytes/sizeof(snap_membus_t));
 
     snap_4KiB_winit(&wbuf, hostMem_out + outLineAddr,
-		    dataBytes/sizeof(snap_membus_t));
+            dataBytes/sizeof(snap_membus_t));
 
     /* FIXME check if the condition is correct */
     if ((dataBytes & BF_BLOCK_BADR_MASK) != 0) // check blockwidth alignment
@@ -258,50 +258,40 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
 
  LINE_PROCESSING:
     for (snapu32_t lineOffset = 0; lineOffset < lineCount;
-	 ++lineOffset) {
+     ++lineOffset) {
         fprintf(stderr, "Processing lineOffset=%d ...\n", (int)lineOffset);
 
-	// fetch next line
-	snap_membus_t line;
+    // fetch next line
+    snap_membus_t line;
 
 #ifndef CONFIG_USE_4KIB
-	line = hostMem_in[inLineAddr + lineOffset];
+    line = hostMem_in[inLineAddr + lineOffset];
 #else
-	snap_4KiB_get(&rbuf, &line);
+    snap_4KiB_get(&rbuf, &line);
 #endif
 
-	// determine number of valid blocks in line
-	snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
-	snapu8_t blockCount = dataBlocks - blocksDone;
-	if (blockCount > BF_BLOCKSPERLINE) {
-	    blockCount = BF_BLOCKSPERLINE;
-	}
+    /* // determine number of valid blocks in line */
+    /* snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE); */
+    /* snapu8_t blockCount = dataBlocks - blocksDone; */
+    /* if (blockCount > BF_BLOCKSPERLINE) { */
+    /*     blockCount = BF_BLOCKSPERLINE; */
+    /* } */
 
-	// blockwise processing
-    BLOCKWISE_PROCESSING:
-	for (snapu8_t blockOffset = 0; blockOffset < blockCount;
-	     ++blockOffset) {
-	    snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS;
-	    //bf_halfBlock_t right =  line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS);
-	    //bf_halfBlock_t left = line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0);
-	    bf_halfBlock_t left, right;
-	    bf_lineToBlock(line, blockOffset * 8, left, right);
+    /* // blockwise processing */
+    /* BLOCKWISE_PROCESSING: */
+    /* for (snapu8_t blockOffset = 0; blockOffset < blockCount; */
+    /*      ++blockOffset) { */
+    /*     snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS; */
+    /*     bf_halfBlock_t left, right; */
+    /*     bf_lineToBlock(line, blockOffset * 8, left, right); */
 
-	    //left = bf_bswap(left);
-	    //right = bf_bswap(right);
+    /*     /1* if (decrypt) *1/ */
+    /*  /1* bf_decrypt(left, right); *1/ */
+    /*     /1* else *1/ */
+    /*  /1* bf_encrypt(left, right); *1/ */
 
-	    if (decrypt)
-		bf_decrypt(left, right);
-	    else
-		bf_encrypt(left, right);
-
-	    //left = bf_bswap(left);
-	    //right = bf_bswap(right);
-
-	    bf_blockToLine(line, blockOffset * 8, left, right);
-	    //line.range(blockBitOffset + BF_BLOCKBITS -1, blockBitOffset + BF_HBLOCKBITS) = right;
-	    //line.range(blockBitOffset + BF_HBLOCKBITS-1, blockBitOffset + 0) = left;
-	}
+    /*     bf_blockToLine(line, blockOffset * 8, left, right); */
+    /* } */
 
         // write processed line
         print_line("write", line);
@@ -309,7 +299,7 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
 #ifndef CONFIG_USE_4KIB
         hostMem_out[outLineAddr + lineOffset] = line;
 #else
-	snap_4KiB_put(&wbuf, line);
+    snap_4KiB_put(&wbuf, line);
 #endif
     }
 
@@ -383,9 +373,9 @@ void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
 
     // Host Memory AXI Lite Master Interface
 #pragma HLS DATA_PACK variable=Action_Config
-#pragma HLS INTERFACE s_axilite port=Action_Config bundle=ctrl_reg	offset=0x010
+#pragma HLS INTERFACE s_axilite port=Action_Config bundle=ctrl_reg  offset=0x010
 #pragma HLS DATA_PACK variable=action_reg
-#pragma HLS INTERFACE s_axilite port=action_reg bundle=ctrl_reg	offset=0x100
+#pragma HLS INTERFACE s_axilite port=action_reg bundle=ctrl_reg offset=0x100
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
     /* Required Action Type Detection */
