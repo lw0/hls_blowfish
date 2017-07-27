@@ -122,26 +122,46 @@ static void bf_blockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBloc
 //  line.range(firstByte*8 + 63, firstByte*8 + 56) = (r >> 24) & 0xff;
 }
 
-static bf_halfBlock_t bf_f(bf_halfBlock_t h)
+static void bf_splitLine(snap_membus_t line, bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t rightHBlocks[BF_BPL])
 {
-    bf_sEntry_t a = (bf_sEntry_t)(h >> 24),
-                b = (bf_sEntry_t)(h >> 16),
-                c = (bf_sEntry_t)(h >> 8),
-                d = (bf_sEntry_t) h;
-    return ((g_S[0][a] + g_S[1][b]) ^ g_S[2][c]) + g_S[3][d];
+    for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
+    {
+#pragma HLS UNROLL factor=16 //==BF_BPL
+
+    // big endian
+    leftHBlocks[iBlock] =   line.range(iBlock*8 +  7, iBlock*8 +  0) << 24 |
+                            line.range(iBlock*8 + 15, iBlock*8 +  8) << 16 |
+                            line.range(iBlock*8 + 23, iBlock*8 + 16) <<  8 |
+                            line.range(iBlock*8 + 31, iBlock*8 + 24) <<  0;
+
+    rightHBlocks[iBlock] =  line.range(iBlock*8 + 39, iBlock*8 + 32) << 24 |
+                            line.range(iBlock*8 + 47, iBlock*8 + 40) << 16 |
+                            line.range(iBlock*8 + 55, iBlock*8 + 48) <<  8 |
+                            line.range(iBlock*8 + 63, iBlock*8 + 56) <<  0;
+
+    }
 }
 
-static void bf_encrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
+static bf_halfBlock_t bf_f(bf_halfBlock_t h, bf_SiC_t iCpy)
 {
-    printf("bf_encrypt(0x%08x, 0x%08x)", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right));
+    bf_SiE_t a = (bf_SiE_t)(h >> 24),
+             b = (bf_SiE_t)(h >> 16),
+             c = (bf_SiE_t)(h >> 8),
+             d = (bf_SiE_t) h;
+    return ((g_S[iCpy][0][a] + g_S[iCpy][1][b]) ^ g_S[iCpy][2][c]) + g_S[iCpy][3][d];
+}
+
+static void bf_encrypt(bf_halfBlock_t & left, bf_halfBlock_t & right, bf_SiC_t iCpy)
+{
+    printf("bf_encrypt(0x%08x, 0x%08x, %d)", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right), *((uint32_t *)(void *)iCpy));
 
 BF_ENCRYPT:
     for (int i = 0; i < 16; i += 2) {
-#pragma HLS UNROLL factor=16
+// #pragma HLS UNROLL factor=16 LW: Can not unroll because of bf_f() dependencies
         left ^= g_P[i];
-        right ^= bf_f(left);
+        right ^= bf_f(left, iCpy);
         right ^= g_P[i+1];
-        left ^= bf_f(right);
+        left ^= bf_f(right, iCpy);
     }
     left ^= g_P[16];
     right ^= g_P[17];
@@ -153,17 +173,17 @@ BF_ENCRYPT:
     printf(" -> 0x%08x, 0x%08x\n", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right));
 }
 
-static void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right)
+static void bf_decrypt(bf_halfBlock_t & left, bf_halfBlock_t & right, bf_SiC_t iCpy)
 {
-    printf("bf_decrypt(0x%08x, 0x%08x)", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right));
+    printf("bf_decrypt(0x%08x, 0x%08x, %d)", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right), *((uint32_t *)(void *)iCpy));
 
 BF_DECRYPT:
     for (int i = 16; i > 0; i -= 2) {
-#pragma HLS UNROLL factor=16
+//#pragma HLS UNROLL factor=16 LW: Can not unroll because of bf_f() dependencies
         left ^= g_P[i+1];
-        right ^= bf_f(left);
+        right ^= bf_f(left, iCpy);
         right ^= g_P[i];
-        left ^= bf_f(right);
+        left ^= bf_f(right, iCpy);
     }
     left ^= g_P[1];
     right ^= g_P[0];
@@ -178,25 +198,37 @@ BF_DECRYPT:
 static void bf_keyInit(bf_halfBlock_t key[18])
 {
     printf("bf_keyInit() <- \n");
+
+    // init P and S from initP, initS and key
     for (int i = 0; i < 18; ++i) {
         g_P[i] = c_initP[i] ^ key[i];
     }
     for (int n = 0; n < 4; ++n) {
         for (int i = 0; i < 256; ++i) {
-            g_S[n][i] = c_initS[n][i];
+            for (bf_SiC_t iCpy = 0; i < BF_S_CPYCNT; ++iCpy)
+            {
+#pragma HLS UNROLL factor=8 //==BF_S_CPYCNT
+                g_S[iCpy][n][i] = c_initS[n][i];
+            }
         }
     }
+
+    // chain encrypt 0-Block to replace P and S entries
     bf_halfBlock_t left = 0, right = 0;
     for (int i = 0; i < 18; i += 2) {
-        bf_encrypt(left, right);
+        bf_encrypt(left, right, 0);
         g_P[i] = left;
         g_P[i+1] = right;
     }
     for (int n = 0; n < 4; ++n) {
         for (int i = 0; i < 256; i += 2) {
-            bf_encrypt(left, right);
-            g_S[n][i] = left;
-            g_S[n][i+1] = right;
+            bf_encrypt(left, right, 0);
+            for (bf_SiC_t iCpy; i < BF_S_CPYCNT; ++i)
+            {
+#pragma HLS UNROLL factor=8 //BF_S_CPYCNT
+                g_S[iCpy][n][i] = left;
+                g_S[iCpy][n][i+1] = right;
+            }
         }
     }
 }
@@ -232,7 +264,7 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
                             snap_membus_t * hostMem_out, snapu64_t outAddr,
                             snapu32_t dataBytes, snap_bool_t decrypt)
 {
-/*    snapu64_t inLineAddr = inAddr >> ADDR_RIGHT_SHIFT;
+    snapu64_t inLineAddr = inAddr >> ADDR_RIGHT_SHIFT;
     snapu64_t outLineAddr = outAddr >> ADDR_RIGHT_SHIFT;
     snapu32_t dataBlocks = dataBytes >> BF_BLOCK_BADR_BITS;
     
@@ -250,41 +282,45 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
     snap_4KiB_winit(&wbuf, hostMem_out + outLineAddr, dataBytes/sizeof(snap_membus_t));
 
 
-    snapu32_t lineCount = dataBlocks / BF_BLOCKSPERLINE;
+    snapu32_t lineCount = dataBlocks / BF_BPL;
     fprintf(stderr, "Processing lineCount=%d ...\n", (int)lineCount);
 
     LINE_PROCESSING:
-    for (snapu32_t lineOffset = 0; lineOffset < lineCount; ++lineOffset)
+    for (snapu32_t iLine = 0; iLine < lineCount; ++iLine)
     {
-        fprintf(stderr, "Processing lineOffset=%d ...\n", (int)lineOffset);
+        fprintf(stderr, "Processing lineOffset=%d ...\n", (int)iLine);
 
         // fetch next line
         snap_membus_t line;
 
         snap_4KiB_get(&rbuf, &line);
 
-        // determine number of valid blocks in line
-        snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
-        snapu8_t blockCount = dataBlocks - blocksDone;
-        if (blockCount > BF_BLOCKSPERLINE)
-        {
-            blockCount = BF_BLOCKSPERLINE;
-        }
+        // // determine number of valid blocks in line
+        // snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
+        // snapu8_t blockCount = dataBlocks - blocksDone;
+        // if (blockCount > BF_BLOCKSPERLINE)
+        // {
+        //     blockCount = BF_BLOCKSPERLINE;
+        // }
 
+        bf_halfBlock_t leftHBlocks[BF_BPL];
+#pragma HLS ARRAY_PARTITION variable=leftHBlocks complete
+        bf_halfBlock_t rightHBlocks[BF_BPL];
+#pragma HLS ARRAY_PARTITION variable=rightHBlocks complete
+        bf_splitLine(line, leftHBlocks, rightHBlocks);
         // blockwise processing
         BLOCKWISE_PROCESSING:
-        for (snapu8_t blockOffset = 0; blockOffset < blockCount; ++blockOffset)
+        for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
         {
-            snapu16_t blockBitOffset = blockOffset * BF_BLOCKBITS;
-            bf_halfBlock_t left, right;
-            bf_lineToBlock(line, blockOffset * 8, left, right);
+#pragma HLS UNROLL factor=16 //BF_INST
+            //bf_lineToBlock(line, iBlock * 8, left, right);
 
             if (decrypt)
-                bf_decrypt(left, right);
+                bf_decrypt(leftHBlocks[iBlock], rightHBlocks[iBlock], iBlock % BF_INST);
             else
-                bf_encrypt(left, right);
+                bf_encrypt(leftHBlocks[iBlock], rightHBlocks[iBlock], iBlock % BF_INST);
 
-            bf_blockToLine(line, blockOffset * 8, left, right);
+            //bf_blockToLine(line, iBlock * 8, left, right);
         }
 
         // write processed line
@@ -294,12 +330,7 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
     }
 
     snap_4KiB_flush(&wbuf);
-    return SNAP_RETC_SUCCESS;*/
-    bf_halfBlock_t left = 0, right = 0;
-    for (snapu32_t i = 0; i < dataBlocks; ++i)
-    {
-        bf_encrypt(left, right);
-    }
+    return SNAP_RETC_SUCCESS;
 }
 
 static snapu32_t process_action(snap_membus_t * din_gmem,
@@ -361,6 +392,12 @@ void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
 #pragma HLS DATA_PACK variable=action_reg
 #pragma HLS INTERFACE s_axilite port=action_reg bundle=ctrl_reg offset=0x100
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
+
+    // Split S array into 4*BF_INST/2 separate BRAMs for sufficient # of read ports
+#pragma HLS ARRAY_PARTITION variable=g_S complete dim=1
+#pragma HLS ARRAY_PARTITION variable=g_S complete dim=2
+#pragma HLS ARRAY_PARTITION variable=g_P complete
+
 
     /* Required Action Type Detection */
     switch (action_reg->Control.flags) {
