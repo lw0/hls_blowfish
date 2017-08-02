@@ -129,16 +129,34 @@ static void bf_splitLine(snap_membus_t line, bf_halfBlock_t leftHBlocks[BF_BPL],
 #pragma HLS UNROLL factor=16 //==BF_BPL
 
     // big endian
-    leftHBlocks[iBlock] =   line.range(iBlock*8 +  7, iBlock*8 +  0) << 24 |
-                            line.range(iBlock*8 + 15, iBlock*8 +  8) << 16 |
-                            line.range(iBlock*8 + 23, iBlock*8 + 16) <<  8 |
-                            line.range(iBlock*8 + 31, iBlock*8 + 24) <<  0;
+    leftHBlocks[iBlock] =   line.range(iBlock*64 +  7, iBlock*64 +  0) << 24 |
+                            line.range(iBlock*64 + 15, iBlock*64 +  8) << 16 |
+                            line.range(iBlock*64 + 23, iBlock*64 + 16) <<  8 |
+                            line.range(iBlock*64 + 31, iBlock*64 + 24) <<  0;
 
-    rightHBlocks[iBlock] =  line.range(iBlock*8 + 39, iBlock*8 + 32) << 24 |
-                            line.range(iBlock*8 + 47, iBlock*8 + 40) << 16 |
-                            line.range(iBlock*8 + 55, iBlock*8 + 48) <<  8 |
-                            line.range(iBlock*8 + 63, iBlock*8 + 56) <<  0;
+    rightHBlocks[iBlock] =  line.range(iBlock*64 + 39, iBlock*64 + 32) << 24 |
+                            line.range(iBlock*64 + 47, iBlock*64 + 40) << 16 |
+                            line.range(iBlock*64 + 55, iBlock*64 + 48) <<  8 |
+                            line.range(iBlock*64 + 63, iBlock*64 + 56) <<  0;
 
+    }
+}
+
+static void bf_joinLine(snap_membus_t & line, bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t rightHBlocks[BF_BPL])
+{
+    for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
+    {
+#pragma HLS UNROLL factor=16 //==BF_BPL
+        // big endian
+        line.range(iBlock*64 +  7, iBlock*64 +  0) = (leftHBlocks[iBlock] >> 24) & 0xff;
+        line.range(iBlock*64 + 15, iBlock*64 +  8) = (leftHBlocks[iBlock] >> 16) & 0xff;
+        line.range(iBlock*64 + 23, iBlock*64 + 16) = (leftHBlocks[iBlock] >>  8) & 0xff;
+        line.range(iBlock*64 + 31, iBlock*64 + 24) = (leftHBlocks[iBlock] >>  0) & 0xff;
+
+        line.range(iBlock*64 + 39, iBlock*64 + 32) = (rightHBlocks[iBlock] >> 24) & 0xff;
+        line.range(iBlock*64 + 47, iBlock*64 + 40) = (rightHBlocks[iBlock] >> 16) & 0xff;
+        line.range(iBlock*64 + 55, iBlock*64 + 48) = (rightHBlocks[iBlock] >>  8) & 0xff;
+        line.range(iBlock*64 + 63, iBlock*64 + 56) = (rightHBlocks[iBlock] >>  0) & 0xff;
     }
 }
 
@@ -195,6 +213,78 @@ BF_DECRYPT:
     printf(" -> 0x%08x, 0x%08x\n", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right));
 }
 
+static void bf_encryptLine(bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t rightHBlocks[BF_BPL])
+{
+#pragma HLS ARRAY_PARTITION variable=leftHBlocks complete
+#pragma HLS ARRAY_PARTITION variable=rightHBlocks complete
+
+    bf_halfBlock_t pL, pR;
+    BF_ENCRYPT:
+    for (int i = 0; i < 16; i += 2) {
+        pL = g_P[i];
+        pR = g_P[i+1];
+        for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
+        {
+#pragma HLS UNROLL factor=16 //==BF_BPL
+            leftHBlocks[iBlock] ^= pL;
+            rightHBlocks[iBlock] ^= bf_f(leftHBlocks[iBlock], iBlock/2);
+            rightHBlocks[iBlock] ^= pR;
+            leftHBlocks[iBlock] ^= bf_f(rightHBlocks[iBlock], iBlock/2);
+        }
+    }
+
+    pL = g_P[16];
+    pR = g_P[17];
+
+    for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
+    {
+#pragma HLS UNROLL factor=16 //==BF_BPL
+        leftHBlocks[iBlock] ^= pL;
+        rightHBlocks[iBlock] ^= pR;
+
+        // swap left, right
+        bf_halfBlock_t tmp = leftHBlocks[iBlock];
+        leftHBlocks[iBlock] = rightHBlocks[iBlock];
+        rightHBlocks[iBlock] = tmp;
+    }
+}
+
+static void bf_decryptLine(bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t rightHBlocks[BF_BPL])
+{
+#pragma HLS ARRAY_PARTITION variable=leftHBlocks complete
+#pragma HLS ARRAY_PARTITION variable=rightHBlocks complete
+
+    bf_halfBlock_t pL, pR;
+    BF_DECRYPT:
+    for (int i = 16; i > 0; i -= 2) {
+        pL = g_P[i+1];
+        pR = g_P[i];
+        for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
+        {
+#pragma HLS UNROLL factor=16 //==BF_BPL
+            leftHBlocks[iBlock] ^= g_P[i+1];
+            rightHBlocks[iBlock] ^= bf_f(leftHBlocks[iBlock], iBlock/2);
+            rightHBlocks[iBlock] ^= g_P[i];
+            leftHBlocks[iBlock] ^= bf_f(rightHBlocks[iBlock], iBlock/2);
+        }
+    }
+
+    pL = g_P[1];
+    pR = g_P[0];
+
+
+    for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
+    {
+#pragma HLS UNROLL factor=16 //==BF_BPL
+        leftHBlocks[iBlock] ^= g_P[1];
+        rightHBlocks[iBlock] ^= g_P[0];
+
+        // swap left, right
+        bf_halfBlock_t tmp = leftHBlocks[iBlock];
+        leftHBlocks[iBlock] = rightHBlocks[iBlock];
+        rightHBlocks[iBlock] = tmp;
+    }
+}
 static void bf_keyInit(bf_halfBlock_t key[18])
 {
     printf("bf_keyInit() <- \n");
@@ -290,43 +380,25 @@ static snapu32_t action_endecrypt(snap_membus_t * hostMem_in, snapu64_t inAddr,
     {
         fprintf(stderr, "Processing lineOffset=%d ...\n", (int)iLine);
 
-        // fetch next line
         snap_membus_t line;
-
-        snap_4KiB_get(&rbuf, &line);
-
-        // // determine number of valid blocks in line
-        // snapu8_t blocksDone = (lineOffset * BF_BLOCKSPERLINE);
-        // snapu8_t blockCount = dataBlocks - blocksDone;
-        // if (blockCount > BF_BLOCKSPERLINE)
-        // {
-        //     blockCount = BF_BLOCKSPERLINE;
-        // }
-
         bf_halfBlock_t leftHBlocks[BF_BPL];
-#pragma HLS ARRAY_PARTITION variable=leftHBlocks complete
         bf_halfBlock_t rightHBlocks[BF_BPL];
-#pragma HLS ARRAY_PARTITION variable=rightHBlocks complete
+
+        // fetch next line
+        snap_4KiB_get(&rbuf, &line);
         bf_splitLine(line, leftHBlocks, rightHBlocks);
-        // blockwise processing
-        BLOCKWISE_PROCESSING:
-        for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
-        {
-#pragma HLS UNROLL factor=16 //BF_INST
-            //bf_lineToBlock(line, iBlock * 8, left, right);
 
-            if (decrypt)
-                bf_decrypt(leftHBlocks[iBlock], rightHBlocks[iBlock], iBlock % BF_INST);
-            else
-                bf_encrypt(leftHBlocks[iBlock], rightHBlocks[iBlock], iBlock % BF_INST);
-
-            //bf_blockToLine(line, iBlock * 8, left, right);
-        }
+        // process line
+        if (decrypt)
+            bf_decryptLine(leftHBlocks, rightHBlocks);
+        else
+            bf_encryptLine(leftHBlocks, rightHBlocks);
 
         // write processed line
-        print_line("write", line);
-
+        bf_joinLine(line, leftHBlocks, rightHBlocks);
         snap_4KiB_put(&wbuf, line);
+
+        print_line("write", line);
     }
 
     snap_4KiB_flush(&wbuf);
@@ -395,7 +467,6 @@ void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
 
     // Split S array into 4*BF_INST/2 separate BRAMs for sufficient # of read ports
 #pragma HLS ARRAY_PARTITION variable=g_S complete dim=1
-#pragma HLS ARRAY_PARTITION variable=g_S complete dim=2
 #pragma HLS ARRAY_PARTITION variable=g_P complete
 
 

@@ -66,6 +66,8 @@ typedef ap_uint<BF_P_ENTCNT_W> bf_PiE_t;
 
 typedef ap_uint<BF_BPL_W + 1> bf_uiBpL_t;
 
+typedef ap_uint<5> bf_iteration_t;
+
 //---------------------------------------------------------------------
 typedef struct {
     CONTROL Control;	/*  16 bytes */
