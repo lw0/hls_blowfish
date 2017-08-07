@@ -295,7 +295,7 @@ static void bf_keyInit(bf_halfBlock_t key[18])
     }
     for (int n = 0; n < 4; ++n) {
         for (int i = 0; i < 256; ++i) {
-            for (bf_SiC_t iCpy = 0; i < BF_S_CPYCNT; ++iCpy)
+            for (bf_SiC_t iCpy = 0; iCpy < BF_S_CPYCNT; ++iCpy)
             {
 #pragma HLS UNROLL factor=8 //==BF_S_CPYCNT
                 g_S[iCpy][n][i] = c_initS[n][i];
@@ -313,7 +313,7 @@ static void bf_keyInit(bf_halfBlock_t key[18])
     for (int n = 0; n < 4; ++n) {
         for (int i = 0; i < 256; i += 2) {
             bf_encrypt(left, right, 0);
-            for (bf_SiC_t iCpy; i < BF_S_CPYCNT; ++i)
+            for (bf_SiC_t iCpy; iCpy < BF_S_CPYCNT; ++iCpy)
             {
 #pragma HLS UNROLL factor=8 //BF_S_CPYCNT
                 g_S[iCpy][n][i] = left;
