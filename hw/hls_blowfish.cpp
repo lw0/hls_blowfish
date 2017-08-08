@@ -215,7 +215,7 @@ BF_DECRYPT:
 
 static void bf_fLine(bf_halfBlock_t res[BF_BPL], bf_halfBlock_t h[BF_BPL])
 {
-//TODO-LW necessary? #pragma HLS ARRAY_PARTITION variable=h complete
+    BF_F_LINE:
     for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
     {
 #pragma HLS UNROLL factor=16 //==BF_BPL
@@ -230,6 +230,7 @@ static void bf_fLine(bf_halfBlock_t res[BF_BPL], bf_halfBlock_t h[BF_BPL])
 
 static void bf_xorOne(bf_halfBlock_t res[BF_BPL], bf_halfBlock_t lhs[BF_BPL], bf_halfBlock_t rhs)
 {
+    BF_XOR_ONE:
     for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
     {
 #pragma HLS UNROLL factor=16 //==BF_BPL
@@ -239,6 +240,7 @@ static void bf_xorOne(bf_halfBlock_t res[BF_BPL], bf_halfBlock_t lhs[BF_BPL], bf
 
 static void bf_xorAll(bf_halfBlock_t res[BF_BPL], bf_halfBlock_t lhs[BF_BPL], bf_halfBlock_t rhs[BF_BPL])
 {
+    BF_XOR_ALL:
     for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
     {
 #pragma HLS UNROLL factor=16 //==BF_BPL
@@ -251,48 +253,21 @@ static void bf_encryptLine(bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t ri
 #pragma HLS ARRAY_PARTITION variable=leftHBlocks complete
 #pragma HLS ARRAY_PARTITION variable=rightHBlocks complete
 
-    bf_halfBlock_t pL, pR;
-    BF_ENCRYPT:
+    BF_ENCRYPT_LINE:
     for (int i = 0; i < 16; i += 2) {
-        pL = g_P[i];
-        pR = g_P[i+1];
-
         bf_halfBlock_t fRes[BF_BPL];
-        bf_xorOne(leftHBlocks, leftHBlocks, pL);
+        bf_xorOne(leftHBlocks, leftHBlocks, g_P[i]);
         bf_fLine(fRes, leftHBlocks);
         bf_xorAll(rightHBlocks, rightHBlocks, fRes);
-        bf_xorOne(rightHBlocks, rightHBlocks, pR);
+        bf_xorOne(rightHBlocks, rightHBlocks, g_P[i+1]);
         bf_fLine(fRes, rightHBlocks);
         bf_xorAll(leftHBlocks, leftHBlocks, fRes);
-        /* for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock) */
-        /* { */
-/* #pragma HLS UNROLL factor=16 //==BF_BPL */
-        /*     leftHBlocks[iBlock] ^= pL; */
-        /*     rightHBlocks[iBlock] ^= bf_f(leftHBlocks[iBlock], iBlock/2); */
-        /*     rightHBlocks[iBlock] ^= pR; */
-        /*     leftHBlocks[iBlock] ^= bf_f(rightHBlocks[iBlock], iBlock/2); */
-        /* } */
     }
 
-    pL = g_P[16];
-    pR = g_P[17];
-
     bf_halfBlock_t tmp[BF_BPL];
-    bf_xorOne(tmp, leftHBlocks, pL);
-    bf_xorOne(leftHBlocks, rightHBlocks, pR);
+    bf_xorOne(tmp, leftHBlocks, g_P[16]);
+    bf_xorOne(leftHBlocks, rightHBlocks, g_P[17]);
     rightHBlocks = tmp;
-
-    /* for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock) */
-    /* { */
-/* #pragma HLS UNROLL factor=16 //==BF_BPL */
-    /*     leftHBlocks[iBlock] ^= pL; */
-    /*     rightHBlocks[iBlock] ^= pR; */
-
-    /*     // swap left, right */
-    /*     bf_halfBlock_t tmp = leftHBlocks[iBlock]; */
-    /*     leftHBlocks[iBlock] = rightHBlocks[iBlock]; */
-    /*     rightHBlocks[iBlock] = tmp; */
-    /* } */
 }
 
 static void bf_decryptLine(bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t rightHBlocks[BF_BPL])
@@ -300,37 +275,23 @@ static void bf_decryptLine(bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t ri
 #pragma HLS ARRAY_PARTITION variable=leftHBlocks complete
 #pragma HLS ARRAY_PARTITION variable=rightHBlocks complete
 
-    bf_halfBlock_t pL, pR;
-    BF_DECRYPT:
+    BF_DECRYPT_LINE:
     for (int i = 16; i > 0; i -= 2) {
-        pL = g_P[i+1];
-        pR = g_P[i];
-        for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
-        {
-#pragma HLS UNROLL factor=16 //==BF_BPL
-            leftHBlocks[iBlock] ^= g_P[i+1];
-            rightHBlocks[iBlock] ^= bf_f(leftHBlocks[iBlock], iBlock/2);
-            rightHBlocks[iBlock] ^= g_P[i];
-            leftHBlocks[iBlock] ^= bf_f(rightHBlocks[iBlock], iBlock/2);
-        }
+        bf_halfBlock_t fRes[BF_BPL];
+        bf_xorOne(leftHBlocks, leftHBlocks, g_P[i+1]);
+        bf_fLine(fRes, leftHBlocks);
+        bf_xorAll(rightHBlocks, rightHBlocks, fRes);
+        bf_xorOne(rightHBlocks, rightHBlocks, g_P[i]);
+        bf_fLine(fRes, rightHBlocks);
+        bf_xorAll(leftHBlocks, leftHBlocks, fRes);
     }
 
-    pL = g_P[1];
-    pR = g_P[0];
-
-
-    for (bf_uiBpL_t iBlock = 0; iBlock < BF_BPL; ++iBlock)
-    {
-#pragma HLS UNROLL factor=16 //==BF_BPL
-        leftHBlocks[iBlock] ^= g_P[1];
-        rightHBlocks[iBlock] ^= g_P[0];
-
-        // swap left, right
-        bf_halfBlock_t tmp = leftHBlocks[iBlock];
-        leftHBlocks[iBlock] = rightHBlocks[iBlock];
-        rightHBlocks[iBlock] = tmp;
-    }
+    bf_halfBlock_t tmp[BF_BPL];
+    bf_xorOne(tmp, leftHBlocks, g_P[1]);
+    bf_xorOne(leftHBlocks, rightHBlocks, g_P[0]);
+    rightHBlocks = tmp;
 }
+
 static void bf_keyInit(bf_halfBlock_t key[18])
 {
     printf("bf_keyInit() <- \n");
