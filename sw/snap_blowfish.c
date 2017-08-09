@@ -1,8 +1,7 @@
 /*
  * Example Blowfish Implementation for HLS tryout
  *
- * Use Adjacency list to describe a graph:
- *        https://en.wikipedia.org/wiki/Adjacency_list
+ * Experimental, use for real data not reccomended
  *
  * Wikipedia's pages are based on "CC BY-SA 3.0"
  * Creative Commons Attribution-ShareAlike License 3.0
@@ -12,6 +11,7 @@
 /*
  * Copyright 2017 International Business Machines
  * Copyright 2017 Lukas Wenzel, HPI
+ * Copyright 2017 Balthasar Martin, HPI
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,20 +46,9 @@ static const char *version = GIT_VERSION;
 int verbose_flag = 0;
 
 /*
- * BFS: breadth first search
- *    Simple demo to traverse a graph stored in adjcent table.
+ * Blowfish: a symmetric-key block cipher (https://en.wikipedia.org/wiki/Blowfish_(cipher))
+ *    Simple demo to encrypt and decrypt with blowfish in ECB-mode.
  *
- *    A directed graph with vertexs (or called node) and edges (or called arc)
- *    The adjacent table format is:
- *    vex_list[0]   -> {edge, vex_index} -> {edge, vex_index} -> ... -> NULL
- *    vex_list[1]   -> {edge, vex_index} -> {edge, vex_index} -> ... -> NULL
- *    ...
- *    vex_list[N-1] -> {edge, vex_index} -> {edge, vex_index} -> ... -> NULL
- *
- * Function:
- *    Starting from each vertex node (called 'root'),
- *      and search all of the vertexes that it can reach.
- *      Visited nodes are recorded in obuf.
  *
  * Implementation:
  *    We ask FPGA to visit the host memory to traverse this data structure.
@@ -197,7 +186,7 @@ static int blowfish_set_key(struct snap_action *action, unsigned long timeout,
     return -EIO;
 }
 
-static int blowfish_cypher(struct snap_action *action,
+static int blowfish_cipher(struct snap_action *action,
                int mode, unsigned long timeout,
                const uint8_t *ibuf,
                unsigned int in_len,
@@ -324,14 +313,14 @@ static int blowfish_test(struct snap_action *action, unsigned long timeout)
         return -1;
 
     /* Encrypt data */
-    rc = blowfish_cypher(action, MODE_ENCRYPT, timeout,
+    rc = blowfish_cipher(action, MODE_ENCRYPT, timeout,
                  example_plaintext, sizeof(example_plaintext),
                  example_encrypted, sizeof(example_encrypted));
     if (rc != 0)
         return -2;
 
     /* Decrypt data */
-    rc = blowfish_cypher(action, MODE_DECRYPT, timeout,
+    rc = blowfish_cipher(action, MODE_DECRYPT, timeout,
                  example_encrypted, sizeof(example_encrypted),
                  example_decrypted, sizeof(example_decrypted));
     if (rc != 0)
@@ -444,7 +433,7 @@ int main(int argc, char *argv[])
 	}
     }
 
-    fprintf(stderr, "Blowfish Cypher\n"
+    fprintf(stderr, "Blowfish cipher\n"
 	    "  operation: %s input: %s output: %s key: %s\n",
 	    decrypt ? "decrypt" : "encrypt", input, output, key);
 
@@ -509,7 +498,7 @@ int main(int argc, char *argv[])
         goto out_error3;
 
     /* Encrypt/decrypt data */
-    rc = blowfish_cypher(action, decrypt ? MODE_DECRYPT : MODE_ENCRYPT,
+    rc = blowfish_cipher(action, decrypt ? MODE_DECRYPT : MODE_ENCRYPT,
                  timeout, ibuf, ilen, obuf, ilen);
     if (rc != 0)
         goto out_error3;
