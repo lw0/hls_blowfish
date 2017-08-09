@@ -14,9 +14,20 @@
 # limitations under the License.
 #
 
+# Finding $SNAP_ROOT
+ifndef SNAP_ROOT
+# check if we are in sw folder of an action (three directories below snap root)
+ifneq ("$(wildcard ../../../ActionTypes.md)","")
+SNAP_ROOT=$(abspath ../../../)
+else
+$(info You are not building your software from the default directory (/path/to/snap/actions/<action_name>/sw) or specified a wrong $$SNAP_ROOT.)
+$(error Please source /path/to/snap/hardware/snap_settings.sh or set $$SNAP_ROOT manually.)
+endif
+endif
+
 snap_blowfish: action_blowfish.o
 snap_blowfish_objs = action_blowfish.o
 
 projs += snap_blowfish
 
-include ../../software.mk
+include ($SNAP_ROOT)/actions/software.mk
