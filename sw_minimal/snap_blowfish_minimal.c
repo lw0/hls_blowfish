@@ -64,6 +64,7 @@ static void snap_prepare_blowfish(struct snap_job *job,
         void *addr_out,
         uint16_t type_out)
 {
+    //initialize SNAP addresses
     snap_addr_set(&bjob_in->input_data, addr_in, data_length_in,
 		  type_in, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_SRC);
 
@@ -71,6 +72,7 @@ static void snap_prepare_blowfish(struct snap_job *job,
 		  type_out, SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
 		  SNAP_ADDRFLAG_END );
 
+    // fill job struct
     bjob_in->mode = mode_in;
     bjob_in->data_length = data_length_in;
 
@@ -183,5 +185,10 @@ int main()
 
     action = snap_attach_action(card, BLOWFISH_ACTION_TYPE, action_irq, 60);
     blowfish_test(action, timeout);
+
+    snap_detach_action(action);
+    snap_card_free(card);
+    exit(EXIT_SUCCESS);
+
     return 0;
 }
