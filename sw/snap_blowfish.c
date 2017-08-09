@@ -75,7 +75,7 @@ int verbose_flag = 0;
  * E.g. like this:
  *   __attribute__((align(64)));
  */
-static const uint8_t example_plaintext[] __attribute__((aligned(64))) = {
+static const uint8_t example_plaintext[] __attribute__((aligned(128))) = {
     0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /*  8 bytes */
     0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 16 bytes */
     0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /* 24 bytes */
@@ -86,15 +86,15 @@ static const uint8_t example_plaintext[] __attribute__((aligned(64))) = {
     0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, /* 64 bytes */
 };
 
-static uint8_t example_encrypted[64] __attribute__((aligned(64))) = {
+static uint8_t example_encrypted[64] __attribute__((aligned(128))) = {
     0x00,
 };
 
-static uint8_t example_decrypted[64] __attribute__((aligned(64))) = {
+static uint8_t example_decrypted[64] __attribute__((aligned(128))) = {
     0x00,
 };
 
-static uint8_t example_key[] __attribute__((aligned(64))) = {
+static uint8_t example_key[] __attribute__((aligned(128))) = {
     0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77
 };
 
