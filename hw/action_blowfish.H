@@ -51,6 +51,8 @@
 // blocks per line (block: 8B / 64b; line 128B / 1024b)
 #define BF_BPL_W 4
 #define BF_BPL (1 << BF_BPL_W)
+#define BF_HBPL_W (BF_BPL_W + 1)
+#define BF_HBPL (1 << BF_HBPL_W)
 
 typedef ap_uint<BF_BLOCKBITS> bf_block_t;
 typedef ap_uint<BF_HBLOCKBITS> bf_halfBlock_t;
@@ -65,6 +67,7 @@ typedef ap_uint<BF_P_DATA_W> bf_P_t[BF_P_ENTCNT];
 typedef ap_uint<BF_P_ENTCNT_W> bf_PiE_t;
 
 typedef ap_uint<BF_BPL_W + 1> bf_uiBpL_t;
+typedef ap_uint<BF_HBPL_W + 1> bf_uiHBpL_t;
 
 typedef ap_uint<5> bf_iteration_t;
 

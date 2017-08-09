@@ -33,94 +33,19 @@ static void print_line(const char *msg, snap_membus_t line)
 #endif
 }
 
-/* FIXME Cutting out bits at variable offsets might be bad,
-   well just used for keystore might be fine */
-static bf_halfBlock_t bf_lineToHBlock(const snap_membus_t & line, unsigned firstByte)
+static void bf_splitKeyLine(snap_membus_t line, bf_halfBlock_t keyHBlocks[BF_HBPL], bf_uiHBpL_t keyLength)
 {
-    bf_halfBlock_t h = 0;
-    // big endian
-    h |= line.range(firstByte*8 +  7, firstByte*8 +  0) << 24;
-    h |= line.range(firstByte*8 + 15, firstByte*8 +  8) << 16;
-    h |= line.range(firstByte*8 + 23, firstByte*8 + 16) <<  8;
-    h |= line.range(firstByte*8 + 31, firstByte*8 + 24) <<  0;
-
-    // little endian
-//  h |= line.range(firstByte*8 +  7, firstByte*8 +  0) <<  0;
-//  h |= line.range(firstByte*8 + 15, firstByte*8 +  8) <<  8;
-//  h |= line.range(firstByte*8 + 23, firstByte*8 + 16) << 16;
-//  h |= line.range(firstByte*8 + 31, firstByte*8 + 24) << 24;
-
-    return h;
+    for (bf_uiHBpL_t iHBlock = 0; iHBlock < BF_HBPL; ++iHBlock)
+    {
+    	//big endian
+        bf_uiHBpL_t blockPos = (iHBlock % keyLength) * 32;
+        keyHBlocks[iHBlock] = line.range(blockPos +  7, blockPos +  0) << 24 |
+                              line.range(blockPos + 15, blockPos +  8) << 16 |
+                              line.range(blockPos + 23, blockPos + 16) <<  8 |
+                              line.range(blockPos + 31, blockPos + 24) <<  0;
+    }
 }
 
-/* FIXME Cutting out bits at variable offsets might be bad */
-static void bf_hBlockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBlock_t h)
-{
-    // big endian
-//  line.range(firstByte*8 +  7, firstByte*8 +  0) = (h >> 24) & 0xff;
-//  line.range(firstByte*8 + 15, firstByte*8 +  8) = (h >> 16) & 0xff;
-//  line.range(firstByte*8 + 23, firstByte*8 + 16) = (h >>  8) & 0xff;
-//  line.range(firstByte*8 + 31, firstByte*8 + 24) = (h >>  0) & 0xff;
-
-    // little endian
-    line.range(firstByte*8 +  7, firstByte*8 +  0) = (h >>  0) & 0xff;
-    line.range(firstByte*8 + 15, firstByte*8 +  8) = (h >>  8) & 0xff;
-    line.range(firstByte*8 + 23, firstByte*8 + 16) = (h >> 16) & 0xff;
-    line.range(firstByte*8 + 31, firstByte*8 + 24) = (h >> 24) & 0xff;
-}
-
-
-static void bf_lineToBlock(const snap_membus_t & line, unsigned firstByte, bf_halfBlock_t & l, bf_halfBlock_t & r)
-{
-    l = 0;
-    r = 0;
-    // big endian
-    l |= line.range(firstByte*8 +  7, firstByte*8 +  0) << 24;
-    l |= line.range(firstByte*8 + 15, firstByte*8 +  8) << 16;
-    l |= line.range(firstByte*8 + 23, firstByte*8 + 16) <<  8;
-    l |= line.range(firstByte*8 + 31, firstByte*8 + 24) <<  0;
-
-    r |= line.range(firstByte*8 + 39, firstByte*8 + 32) << 24;
-    r |= line.range(firstByte*8 + 47, firstByte*8 + 40) << 16;
-    r |= line.range(firstByte*8 + 55, firstByte*8 + 48) <<  8;
-    r |= line.range(firstByte*8 + 63, firstByte*8 + 56) <<  0;
-
-    // little endian
-//  l |= line.range(firstByte*8 +  7, firstByte*8 +  0) <<  0;
-//  l |= line.range(firstByte*8 + 15, firstByte*8 +  8) <<  8;
-//  l |= line.range(firstByte*8 + 23, firstByte*8 + 16) << 16;
-//  l |= line.range(firstByte*8 + 31, firstByte*8 + 24) << 24;
-//
-//  r |= line.range(firstByte*8 + 39, firstByte*8 + 32) <<  0;
-//  r |= line.range(firstByte*8 + 47, firstByte*8 + 40) <<  8;
-//  r |= line.range(firstByte*8 + 55, firstByte*8 + 48) << 16;
-//  r |= line.range(firstByte*8 + 63, firstByte*8 + 56) << 24;
-}
-
-static void bf_blockToLine(snap_membus_t & line, unsigned firstByte, bf_halfBlock_t l, bf_halfBlock_t r)
-{
-    // big endian
-    line.range(firstByte*8 +  7, firstByte*8 +  0) = (l >> 24) & 0xff;
-    line.range(firstByte*8 + 15, firstByte*8 +  8) = (l >> 16) & 0xff;
-    line.range(firstByte*8 + 23, firstByte*8 + 16) = (l >>  8) & 0xff;
-    line.range(firstByte*8 + 31, firstByte*8 + 24) = (l >>  0) & 0xff;
-
-    line.range(firstByte*8 + 39, firstByte*8 + 32) = (r >> 24) & 0xff;
-    line.range(firstByte*8 + 47, firstByte*8 + 40) = (r >> 16) & 0xff;
-    line.range(firstByte*8 + 55, firstByte*8 + 48) = (r >>  8) & 0xff;
-    line.range(firstByte*8 + 63, firstByte*8 + 56) = (r >>  0) & 0xff;
-
-    // little endian
-//  line.range(firstByte*8 +  7, firstByte*8 +  0) = (l >>  0) & 0xff;
-//  line.range(firstByte*8 + 15, firstByte*8 +  8) = (l >>  8) & 0xff;
-//  line.range(firstByte*8 + 23, firstByte*8 + 16) = (l >> 16) & 0xff;
-//  line.range(firstByte*8 + 31, firstByte*8 + 24) = (l >> 24) & 0xff;
-//
-//  line.range(firstByte*8 + 39, firstByte*8 + 32) = (r >>  0) & 0xff;
-//  line.range(firstByte*8 + 47, firstByte*8 + 40) = (r >>  8) & 0xff;
-//  line.range(firstByte*8 + 55, firstByte*8 + 48) = (r >> 16) & 0xff;
-//  line.range(firstByte*8 + 63, firstByte*8 + 56) = (r >> 24) & 0xff;
-}
 
 static void bf_splitLine(snap_membus_t line, bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t rightHBlocks[BF_BPL])
 {
@@ -128,16 +53,16 @@ static void bf_splitLine(snap_membus_t line, bf_halfBlock_t leftHBlocks[BF_BPL],
     {
 #pragma HLS UNROLL factor=16 //==BF_BPL
 
-    // big endian
-    leftHBlocks[iBlock] =   line.range(iBlock*64 +  7, iBlock*64 +  0) << 24 |
-                            line.range(iBlock*64 + 15, iBlock*64 +  8) << 16 |
-                            line.range(iBlock*64 + 23, iBlock*64 + 16) <<  8 |
-                            line.range(iBlock*64 + 31, iBlock*64 + 24) <<  0;
+        // big endian
+        leftHBlocks[iBlock] =   line.range(iBlock*64 +  7, iBlock*64 +  0) << 24 |
+                                line.range(iBlock*64 + 15, iBlock*64 +  8) << 16 |
+                                line.range(iBlock*64 + 23, iBlock*64 + 16) <<  8 |
+                                line.range(iBlock*64 + 31, iBlock*64 + 24) <<  0;
 
-    rightHBlocks[iBlock] =  line.range(iBlock*64 + 39, iBlock*64 + 32) << 24 |
-                            line.range(iBlock*64 + 47, iBlock*64 + 40) << 16 |
-                            line.range(iBlock*64 + 55, iBlock*64 + 48) <<  8 |
-                            line.range(iBlock*64 + 63, iBlock*64 + 56) <<  0;
+        rightHBlocks[iBlock] =  line.range(iBlock*64 + 39, iBlock*64 + 32) << 24 |
+                                line.range(iBlock*64 + 47, iBlock*64 + 40) << 16 |
+                                line.range(iBlock*64 + 55, iBlock*64 + 48) <<  8 |
+                                line.range(iBlock*64 + 63, iBlock*64 + 56) <<  0;
 
     }
 }
@@ -160,6 +85,9 @@ static void bf_joinLine(snap_membus_t & line, bf_halfBlock_t leftHBlocks[BF_BPL]
     }
 }
 
+// ------------------------------------------------------
+// --------------- SINGLE BLOCK ENDECRYPT ---------------
+// ------------------------------------------------------
 static bf_halfBlock_t bf_f(bf_halfBlock_t h, bf_SiC_t iCpy)
 {
     bf_SiE_t a = (bf_SiE_t)(h >> 24),
@@ -213,6 +141,9 @@ BF_DECRYPT:
     printf(" -> 0x%08x, 0x%08x\n", *((uint32_t *)(void *)&left), *((uint32_t *)(void *)&right));
 }
 
+// --------------------------------------------------
+// --------------- LINEWISE ENDECRYPT ---------------
+// --------------------------------------------------
 static void bf_fLine(bf_halfBlock_t res[BF_BPL], bf_halfBlock_t h[BF_BPL])
 {
     BF_F_LINE:
@@ -292,6 +223,9 @@ static void bf_decryptLine(bf_halfBlock_t leftHBlocks[BF_BPL], bf_halfBlock_t ri
     rightHBlocks = tmp;
 }
 
+// -----------------------------------------
+// --------------- KEY INIT ----------------
+// -----------------------------------------
 static void bf_keyInit(bf_halfBlock_t key[18])
 {
     printf("bf_keyInit() <- \n");
@@ -330,24 +264,28 @@ static void bf_keyInit(bf_halfBlock_t key[18])
     }
 }
 
+// ------------------------------------------------
+// --------------- ACTION FUNCTIONS ---------------
+// ------------------------------------------------
 static snapu32_t action_setkey(snap_membus_t * hostMem_in,
                    snapu64_t keyAddr, snapu32_t keyBytes)
 {
     snapu64_t keyLineAddr = keyAddr >> ADDR_RIGHT_SHIFT;
-    snapu8_t keyWords = keyBytes >> BF_HBLOCK_BADR_BITS;
+    snapu8_t keyHBlockCount = keyBytes >> BF_HBLOCK_BADR_BITS;
 
     if ((keyBytes & BF_HBLOCK_BADR_MASK) != 0 || // check keyword (half blockwidth) alignment
-        BF_KEY_HBLOCK_MAX < keyWords ||
-        keyWords < BF_KEY_HBLOCK_MIN) { // check keyword count
+        BF_KEY_HBLOCK_MAX < keyHBlockCount ||
+        keyHBlockCount < BF_KEY_HBLOCK_MIN) { // check keyword count
         return SNAP_RETC_FAILURE;
     }
 
     // key fits in a single line, fetch it
     snap_membus_t keyLine = hostMem_in[keyLineAddr];
     
-    bf_halfBlock_t key[18];
-    for (int i = 0; i < 18; ++i) {
-        key[i] = bf_lineToHBlock(keyLine, (i % keyWords.to_int()) * 4);
+    bf_halfBlock_t key[BF_BPL];
+    bf_splitKeyLine(keyLine, key, keyHBlockCount);
+
+    for (int i = 0; i < 16; ++i) {
         printf("%d : 0x%08x\n", i, *((uint32_t *)(void *)&key[i]));
     }
 
@@ -450,10 +388,6 @@ static snapu32_t process_action(snap_membus_t * din_gmem,
     return retc;
 }
 
-
-//--------------------------------------------------------------------------------------------
-//--- MAIN PROGRAM ---------------------------------------------------------------------------
-//--------------------------------------------------------------------------------------------
 // This example doesn't use FPGA DDR.
 // Need to set Environment Variable "SDRAM_USED=FALSE" before compilation.
 void hls_action(snap_membus_t  *din_gmem, snap_membus_t  *dout_gmem,
