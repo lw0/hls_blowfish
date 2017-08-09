@@ -69,11 +69,11 @@ int verbose_flag = 0;
 
 /*
  * FIXME If you like to use those pointers directly, use an gcc's alignment
- *       attributes and ensure that it is 64 byte aligned.
- * FIXME Use a constant instead of the 64 ... 
+ *       attributes and ensure that it is 128 byte aligned.
+ * FIXME Use a constant instead of the 128 ... 
  *
  * E.g. like this:
- *   __attribute__((align(64)));
+ *   __attribute__((align(128)));
  */
 static const uint8_t example_plaintext[] __attribute__((aligned(128))) = {
     0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, /*  8 bytes */
